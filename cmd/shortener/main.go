@@ -26,7 +26,7 @@ func main() {
 				return
 			}
 
-			reqBodyUrl, err := url.Parse(string(reqBodyCont))
+			reqBodyURL, err := url.Parse(string(reqBodyCont))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
@@ -38,7 +38,7 @@ func main() {
 				return
 			}
 
-			shid2url[shid] = reqBodyUrl
+			shid2url[shid] = reqBodyURL
 
 			w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 			w.WriteHeader(http.StatusCreated)
@@ -51,8 +51,8 @@ func main() {
 			shid := req.URL.EscapedPath()
 			shid = strings.Trim(shid, "/")
 
-			if toRespUrl, isOk := shid2url[shid]; isOk {
-				w.Header().Add("Location", toRespUrl.String())
+			if toRespURL, isOk := shid2url[shid]; isOk {
+				w.Header().Add("Location", toRespURL.String())
 				w.WriteHeader(http.StatusTemporaryRedirect)
 			} else {
 				http.Error(w, "Resource Not Found", http.StatusBadRequest) // http.StatusNotFound
