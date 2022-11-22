@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/Kirill-Znamenskiy/shortener/internal/handlers"
 	"github.com/Kirill-Znamenskiy/shortener/internal/storage"
+	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
 )
@@ -13,8 +14,8 @@ func main() {
 
 	rootHandler := handlers.MakeRootHandler(stg)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", rootHandler)
+	r := chi.NewRouter()
+	r.Handle("/*", rootHandler)
 
-	log.Fatal(http.ListenAndServe("localhost:8080", mux))
+	log.Fatal(http.ListenAndServe("localhost:8080", r))
 }
