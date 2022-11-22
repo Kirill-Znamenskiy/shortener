@@ -1,4 +1,4 @@
-# go-musthave-shortener-tpl
+# Shortener API
 
 Шаблон репозитория для практического трек "Веб-разработка на Go"
 
