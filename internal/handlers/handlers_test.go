@@ -38,7 +38,7 @@ func TestRootHandler(t *testing.T) {
 			resp: response{
 				code:         201,
 				hContentType: "text/plain; charset=UTF-8",
-				body:         `^http://localhost:8080/\w+$`,
+				body:         `^http://localhost:8080/[-\w]+$`,
 			},
 		},
 		{
@@ -116,6 +116,7 @@ func TestRootHandler(t *testing.T) {
 			// запускаем сервер
 			h.ServeHTTP(w, req)
 			resp := w.Result()
+			defer resp.Body.Close()
 
 			// проверяем код ответа
 			if resp.StatusCode != tst.resp.code {
@@ -129,12 +130,6 @@ func TestRootHandler(t *testing.T) {
 				t.Errorf("Expected Location %s, got %s", tst.resp.hLocation, resp.Header.Get("Location"))
 			}
 
-			defer func(Body io.ReadCloser) {
-				err := Body.Close()
-				if err != nil {
-					t.Fatal(err)
-				}
-			}(resp.Body)
 			if tst.resp.body != "" {
 				respBodyBytes, err := io.ReadAll(resp.Body)
 				if err != nil {

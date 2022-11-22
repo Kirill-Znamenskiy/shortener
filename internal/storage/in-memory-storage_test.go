@@ -20,39 +20,39 @@ func makeDefaultStorage(t *testing.T) Storage {
 func TestInMemoryStorage_Get(t *testing.T) {
 	tests := []struct {
 		name     string
-		argShId  string
-		wantUrl  string
+		argShID  string
+		wantURL  string
 		wantIsOk bool
 	}{
 		{
 			name:     "test#1",
-			argShId:  "shortid",
+			argShID:  "shortid",
 			wantIsOk: true,
-			wantUrl:  "https://Kirill.Znamenskiy.pw",
+			wantURL:  "https://Kirill.Znamenskiy.pw",
 		},
 		{
 			name:     "test#2",
-			argShId:  "aaaa",
+			argShID:  "aaaa",
 			wantIsOk: false,
-			wantUrl:  "",
+			wantURL:  "",
 		},
 		{
 			name:     "test#3",
-			argShId:  "",
+			argShID:  "",
 			wantIsOk: false,
-			wantUrl:  "",
+			wantURL:  "",
 		},
 	}
 	stg := makeDefaultStorage(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotUrl, gotIsOk := stg.Get(tt.argShId)
+			gotURL, gotIsOk := stg.Get(tt.argShID)
 			assert.Equal(t, tt.wantIsOk, gotIsOk)
-			gotUrlString := ""
-			if gotUrl != nil {
-				gotUrlString = gotUrl.String()
+			gotURLString := ""
+			if gotURL != nil {
+				gotURLString = gotURL.String()
 			}
-			assert.Equal(t, tt.wantUrl, gotUrlString)
+			assert.Equal(t, tt.wantURL, gotURLString)
 		})
 	}
 }
@@ -60,38 +60,38 @@ func TestInMemoryStorage_Get(t *testing.T) {
 func TestInMemoryStorage_Put(t *testing.T) {
 	tests := []struct {
 		name    string
-		argShId string
-		argUrl  string
+		argShID string
+		argURL  string
 		want    bool
 	}{
 		{
 			name:    "test#1",
-			argShId: "aaa",
-			argUrl:  "abfasb",
+			argShID: "aaa",
+			argURL:  "abfasb",
 			want:    true,
 		},
 		{
 			name:    "test#2",
-			argShId: "bbb",
-			argUrl:  "http://abfasb.org",
+			argShID: "bbb",
+			argURL:  "http://abfasb.org",
 			want:    true,
 		},
 		{
 			name:    "test#2",
-			argShId: "ccc",
-			argUrl:  "",
+			argShID: "ccc",
+			argURL:  "",
 			want:    true,
 		},
 	}
 	stg := makeDefaultStorage(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			u, err := url.Parse(tt.argUrl)
+			u, err := url.Parse(tt.argURL)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			got := stg.Put(tt.argShId, u)
+			got := stg.Put(tt.argShID, u)
 			assert.Equal(t, tt.want, got)
 		})
 	}
