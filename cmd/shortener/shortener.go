@@ -10,7 +10,8 @@ import (
 func main() {
 
 	stg := storage.NewInMemoryStorage()
-	hs := handlers.Handlers{Stg: stg}
 
-	log.Fatal(http.ListenAndServe("localhost:8080", hs.MakeMainHandler()))
+	mainHandler := handlers.MakeMainHandler(stg)
+
+	log.Fatal(http.ListenAndServe("localhost:8080", mainHandler))
 }

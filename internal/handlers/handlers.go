@@ -10,11 +10,8 @@ import (
 	"net/url"
 )
 
-type Handlers struct {
-	Stg storage.Storage
-}
-
-func (hs Handlers) MakeMainHandler() http.Handler {
+func MakeMainHandler(stg storage.Storage) http.Handler {
+	hs := HandlerFuncs{stg: stg}
 	r := chi.NewRouter()
 	r.Post("/", hs.SaveNewURLHandlerFunc)
 	r.Get("/{shid:[-\\w]+}", hs.GetURLHandlerFunc)
@@ -24,7 +21,11 @@ func (hs Handlers) MakeMainHandler() http.Handler {
 	return r
 }
 
-func (hs Handlers) SaveNewURLHandlerFunc(w http.ResponseWriter, req *http.Request) {
+type HandlerFuncs struct {
+	stg storage.Storage
+}
+
+func (hs HandlerFuncs) SaveNewURLHandlerFunc(w http.ResponseWriter, req *http.Request) {
 	reqBodyCont, err := io.ReadAll(req.Body)
 	if err != nil {
 		http.Error(w, err.Error(), 400)
@@ -44,12 +45,12 @@ func (hs Handlers) SaveNewURLHandlerFunc(w http.ResponseWriter, req *http.Reques
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		_, isOk := hs.Stg.Get(shid)
+		_, isOk := hs.stg.Get(shid)
 		if !isOk {
 			break
 		}
 	}
-	hs.Stg.Put(shid, reqBodyURL)
+	hs.stg.Put(shid, reqBodyURL)
 
 	w.Header().Set("Content-Type", "text/plain; charset=UTF-8")
 	w.WriteHeader(http.StatusCreated)
@@ -59,12 +60,12 @@ func (hs Handlers) SaveNewURLHandlerFunc(w http.ResponseWriter, req *http.Reques
 	}
 }
 
-func (hs Handlers) GetURLHandlerFunc(w http.ResponseWriter, req *http.Request) {
+func (hs HandlerFuncs) GetURLHandlerFunc(w http.ResponseWriter, req *http.Request) {
 	//shid := req.URL.EscapedPath()
 	//shid = strings.Trim(shid, "/")
 	shid := chi.URLParam(req, "shid")
 
-	if toRespURL, isOk := hs.Stg.Get(shid); isOk {
+	if toRespURL, isOk := hs.stg.Get(shid); isOk {
 		w.Header().Add("Location", toRespURL.String())
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	} else {

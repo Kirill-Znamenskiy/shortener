@@ -101,7 +101,6 @@ func TestRootHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 	stg.Put("positive-test-2", u)
-	hs := Handlers{Stg: stg}
 	for _, tst := range tests {
 		t.Run(tst.name, func(t *testing.T) {
 			var tstReqBody io.Reader
@@ -115,7 +114,7 @@ func TestRootHandler(t *testing.T) {
 			req := httptest.NewRequest(tst.req.method, tst.req.target, tstReqBody)
 
 			// определяем хендлер
-			h := hs.MakeMainHandler()
+			h := MakeMainHandler(stg)
 			// запускаем сервер
 			h.ServeHTTP(w, req)
 			resp := w.Result()
