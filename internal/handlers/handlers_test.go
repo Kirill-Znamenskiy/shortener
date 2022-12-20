@@ -26,6 +26,7 @@ func TestRootHandler(t *testing.T) {
 		hLocation    string
 		body         string
 	}
+	cfg := config.LoadEnvConfig()
 	tests := []struct {
 		key  string
 		req  request
@@ -41,7 +42,7 @@ func TestRootHandler(t *testing.T) {
 			resp: response{
 				code:         http.StatusCreated,
 				hContentType: "text/plain;charset=UTF-8",
-				body:         `^http://localhost:8080/[-\w]+$`,
+				body:         `^` + cfg.BaseURL + `/[-\w]+$`,
 			},
 		},
 		{
@@ -66,7 +67,7 @@ func TestRootHandler(t *testing.T) {
 			resp: response{
 				code:         http.StatusCreated,
 				hContentType: "application/json;charset=UTF-8",
-				body:         `^\{\"result\"\:\"http://localhost:8080/[-\w]+\"\}$`,
+				body:         `^\{\"result\"\:\"` + cfg.BaseURL + `/[-\w]+\"\}$`,
 			},
 		},
 		{
@@ -131,7 +132,6 @@ func TestRootHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg := config.LoadEnvConfig()
 	for tstInd, tst := range tests {
 		t.Run("Test "+strconv.Itoa(tstInd+1)+" "+tst.key, func(t *testing.T) {
 			var tstReqBody io.Reader
