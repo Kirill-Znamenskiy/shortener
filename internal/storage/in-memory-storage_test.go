@@ -65,25 +65,25 @@ func TestInMemoryStorage_Put(t *testing.T) {
 		name   string
 		argKey string
 		argURL string
-		want   bool
+		want   string
 	}{
 		{
 			name:   "test#1",
 			argKey: "aaa",
 			argURL: "abfasb",
-			want:   true,
+			want:   "aaa",
 		},
 		{
 			name:   "test#2",
 			argKey: "bbb",
 			argURL: "http://abfasb.org",
-			want:   true,
+			want:   "bbb",
 		},
 		{
 			name:   "test#2",
 			argKey: "ccc",
 			argURL: "",
-			want:   true,
+			want:   "ccc",
 		},
 	}
 	stg := makeDefaultStorage(t)
