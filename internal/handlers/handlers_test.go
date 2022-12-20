@@ -7,15 +7,17 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 func TestRootHandler(t *testing.T) {
 	type request struct {
-		method string
-		target string
-		body   string
+		method  string
+		target  string
+		body    string
+		headers map[string]string
 	}
 	type response struct {
 		code         int
@@ -24,25 +26,50 @@ func TestRootHandler(t *testing.T) {
 		body         string
 	}
 	tests := []struct {
-		name string
+		key  string
 		req  request
 		resp response
 	}{
 		{
-			name: "positive test #1",
+			key: "positive",
 			req: request{
 				method: http.MethodPost,
 				target: "/",
-				body:   "https://Kirill.Znamenskiy.pw",
+				body:   "https://Kirill.Znamenskiy.me",
 			},
 			resp: response{
-				code:         201,
-				hContentType: "text/plain; charset=UTF-8",
+				code:         http.StatusCreated,
+				hContentType: "text/plain;charset=UTF-8",
 				body:         `^http://localhost:8080/[-\w]+$`,
 			},
 		},
 		{
-			name: "positive test #2",
+			key: "negative",
+			req: request{
+				method: http.MethodPost,
+				target: "/api/shorten",
+				body:   `{"Url": "https://Kirill.Znamenskiy.pw"}`,
+			},
+			resp: response{
+				code: http.StatusBadRequest,
+			},
+		},
+		{
+			key: "positive",
+			req: request{
+				method:  http.MethodPost,
+				target:  "/api/shorten",
+				body:    `{"Url": "https://Kirill.Znamenskiy.pw"}`,
+				headers: map[string]string{"Content-Type": "application/json;charset=UTF-8"},
+			},
+			resp: response{
+				code:         http.StatusCreated,
+				hContentType: "application/json;charset=UTF-8",
+				body:         `^\{\"result\"\:\"http://localhost:8080/[-\w]+\"\}$`,
+			},
+		},
+		{
+			key: "positive",
 			req: request{
 				method: http.MethodGet,
 				target: "/positive-test-2",
@@ -52,46 +79,45 @@ func TestRootHandler(t *testing.T) {
 				hLocation: "https://Kirill.Znamenskiy.pw",
 			},
 		},
-
 		{
-			name: "negative test #1",
+			key: "negative",
 			req: request{
 				method: http.MethodHead,
 				target: "/",
 			},
 			resp: response{
-				code: 400,
+				code: http.StatusBadRequest,
 			},
 		},
 		{
-			name: "negative test #2",
+			key: "negative",
 			req: request{
 				method: http.MethodGet,
 				target: "/",
 			},
 			resp: response{
-				code: 400,
+				code: http.StatusBadRequest,
 			},
 		},
 		{
-			name: "negative test #3",
+			key: "negative",
 			req: request{
 				method: http.MethodGet,
 				target: "/adgg",
 			},
 			resp: response{
-				code: 400,
+				code: http.StatusBadRequest,
 			},
 		},
 		{
-			name: "negative test #4",
+			key: "negative",
 			req: request{
 				method: http.MethodPost,
 				target: "/",
 				body:   ":ht3240dfkk",
 			},
 			resp: response{
-				code: 400,
+				code: http.StatusBadRequest,
 			},
 		},
 	}
@@ -100,9 +126,12 @@ func TestRootHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stg.Put("positive-test-2", u)
-	for _, tst := range tests {
-		t.Run(tst.name, func(t *testing.T) {
+	_, err = stg.Put("positive-test-2", u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for tstInd, tst := range tests {
+		t.Run("Test "+strconv.Itoa(tstInd+1)+" "+tst.key, func(t *testing.T) {
 			var tstReqBody io.Reader
 			if tst.req.body != "" {
 				tstReqBody = strings.NewReader(tst.req.body)
@@ -112,13 +141,24 @@ func TestRootHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			req := httptest.NewRequest(tst.req.method, tst.req.target, tstReqBody)
+			//if tst.req.headers == nil {
+			//	tst.req.headers = map[string]string{"Content-Type": "text/html;charset=UTF-8"}
+			//}
+			for hName, hValue := range tst.req.headers {
+				req.Header.Set(hName, hValue)
+			}
 
 			// определяем хендлер
 			h := MakeMainHandler(stg)
 			// запускаем сервер
 			h.ServeHTTP(w, req)
 			resp := w.Result()
-			defer resp.Body.Close()
+			defer func() {
+				err := resp.Body.Close()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}()
 
 			// проверяем код ответа
 			if resp.StatusCode != tst.resp.code {
@@ -140,11 +180,11 @@ func TestRootHandler(t *testing.T) {
 				respBodyString := string(respBodyBytes)
 				if rgxp, err := regexp.Compile(tst.resp.body); err == nil {
 					if !rgxp.Match(respBodyBytes) {
-						t.Errorf("Expected body match pattern %s, got %s", tst.resp.body, respBodyBytes)
+						t.Errorf("Expected Body match pattern %s, got %s", tst.resp.body, respBodyBytes)
 					}
 				} else {
 					if respBodyString != tst.resp.body {
-						t.Errorf("Expected body %s, got %s", tst.resp.body, respBodyBytes)
+						t.Errorf("Expected Body %s, got %s", tst.resp.body, respBodyBytes)
 					}
 				}
 			}

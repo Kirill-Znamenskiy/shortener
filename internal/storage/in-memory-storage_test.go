@@ -12,7 +12,10 @@ func makeDefaultStorage(t *testing.T) Storage {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stg.Put("shortid", u)
+	_, err = stg.Put("shortid", u)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	return stg
 }
@@ -20,25 +23,25 @@ func makeDefaultStorage(t *testing.T) Storage {
 func TestInMemoryStorage_Get(t *testing.T) {
 	tests := []struct {
 		name     string
-		argShID  string
+		argKey   string
 		wantURL  string
 		wantIsOk bool
 	}{
 		{
 			name:     "test#1",
-			argShID:  "shortid",
+			argKey:   "shortid",
 			wantIsOk: true,
 			wantURL:  "https://Kirill.Znamenskiy.pw",
 		},
 		{
 			name:     "test#2",
-			argShID:  "aaaa",
+			argKey:   "aaaa",
 			wantIsOk: false,
 			wantURL:  "",
 		},
 		{
 			name:     "test#3",
-			argShID:  "",
+			argKey:   "",
 			wantIsOk: false,
 			wantURL:  "",
 		},
@@ -46,7 +49,7 @@ func TestInMemoryStorage_Get(t *testing.T) {
 	stg := makeDefaultStorage(t)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotURL, gotIsOk := stg.Get(tt.argShID)
+			gotURL, gotIsOk := stg.Get(tt.argKey)
 			assert.Equal(t, tt.wantIsOk, gotIsOk)
 			gotURLString := ""
 			if gotURL != nil {
@@ -59,28 +62,28 @@ func TestInMemoryStorage_Get(t *testing.T) {
 
 func TestInMemoryStorage_Put(t *testing.T) {
 	tests := []struct {
-		name    string
-		argShID string
-		argURL  string
-		want    bool
+		name   string
+		argKey string
+		argURL string
+		want   bool
 	}{
 		{
-			name:    "test#1",
-			argShID: "aaa",
-			argURL:  "abfasb",
-			want:    true,
+			name:   "test#1",
+			argKey: "aaa",
+			argURL: "abfasb",
+			want:   true,
 		},
 		{
-			name:    "test#2",
-			argShID: "bbb",
-			argURL:  "http://abfasb.org",
-			want:    true,
+			name:   "test#2",
+			argKey: "bbb",
+			argURL: "http://abfasb.org",
+			want:   true,
 		},
 		{
-			name:    "test#2",
-			argShID: "ccc",
-			argURL:  "",
-			want:    true,
+			name:   "test#2",
+			argKey: "ccc",
+			argURL: "",
+			want:   true,
 		},
 	}
 	stg := makeDefaultStorage(t)
@@ -91,7 +94,8 @@ func TestInMemoryStorage_Put(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			got := stg.Put(tt.argShID, u)
+			got, err := stg.Put(tt.argKey, u)
+			assert.NoError(t, err)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -100,6 +104,6 @@ func TestInMemoryStorage_Put(t *testing.T) {
 func TestNewInMemoryStorage(t *testing.T) {
 	t.Run("test#1", func(t *testing.T) {
 		got := NewInMemoryStorage()
-		assert.Empty(t, got.shid2url)
+		assert.Empty(t, got.key2url)
 	})
 }
