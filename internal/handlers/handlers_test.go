@@ -48,7 +48,7 @@ func TestRootHandler(t *testing.T) {
 			req: request{
 				method: http.MethodPost,
 				target: "/api/shorten",
-				body:   `{"Url": "https://Kirill.Znamenskiy.pw"}`,
+				body:   `{"URL": "https://Kirill.Znamenskiy.pw"}`,
 			},
 			resp: response{
 				code: http.StatusBadRequest,
@@ -59,7 +59,7 @@ func TestRootHandler(t *testing.T) {
 			req: request{
 				method:  http.MethodPost,
 				target:  "/api/shorten",
-				body:    `{"Url": "https://Kirill.Znamenskiy.pw"}`,
+				body:    `{"URL": "https://Kirill.Znamenskiy.pw"}`,
 				headers: map[string]string{"Content-Type": "application/json;charset=UTF-8"},
 			},
 			resp: response{
@@ -153,12 +153,7 @@ func TestRootHandler(t *testing.T) {
 			// запускаем сервер
 			h.ServeHTTP(w, req)
 			resp := w.Result()
-			defer func() {
-				err := resp.Body.Close()
-				if err != nil {
-					t.Fatal(err)
-				}
-			}()
+			defer resp.Body.Close()
 
 			// проверяем код ответа
 			if resp.StatusCode != tst.resp.code {

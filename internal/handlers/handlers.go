@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"io"
-	"io/ioutil"
 	"mime"
 	"net/http"
 	"net/url"
@@ -19,7 +18,7 @@ func MakeMainHandler(stg storage.Storage) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.ContentCharset("", "UTF-8"))
 	//r.Use(middleware.Compress(5, "text/html", "application/json"))
-	r.Use(middleware.AllowContentType("", "text/html", "application/json"))
+	r.Use(middleware.AllowContentType("", "text/plain", "text/html", "application/json"))
 	r.Post("/", hs.makeWrapperForJSONHandlerFunc(hs.makeSaveNewURLHandlerFunc()))
 	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
 	r.Get("/{key:[-\\w]+}", hs.makeGetURLHandlerFunc())
@@ -33,7 +32,7 @@ type Handlers struct {
 	stg storage.Storage
 }
 
-func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJsonHandler http.Handler) http.HandlerFunc {
+func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		hContentType := req.Header.Get("Content-Type")
 
@@ -56,11 +55,11 @@ func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJsonHandler http.Handler) 
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			reqBodyCont = []byte(`{"Url":"` + string(reqBodyCont) + `"}`)
-			req.Body = ioutil.NopCloser(bytes.NewReader(reqBodyCont))
+			reqBodyCont = []byte(`{"URL":"` + string(reqBodyCont) + `"}`)
+			req.Body = io.NopCloser(bytes.NewReader(reqBodyCont))
 
 			crw := NewCustomResponseWriter()
-			nextJsonHandler.ServeHTTP(crw, req)
+			nextJSONHandler.ServeHTTP(crw, req)
 
 			if crw.StatusCode == http.StatusCreated {
 				respBodyData := new(struct {
@@ -90,7 +89,7 @@ func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJsonHandler http.Handler) 
 				return
 			}
 		} else {
-			nextJsonHandler.ServeHTTP(w, req)
+			nextJSONHandler.ServeHTTP(w, req)
 		}
 	}
 }
@@ -117,7 +116,7 @@ func (hs *Handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 		}
 
 		reqBodyData := new(struct {
-			Url string `json:"url"`
+			URL string `json:"url"`
 		})
 		err = json.Unmarshal(reqBodyBytes, reqBodyData)
 		if err != nil {
@@ -125,7 +124,7 @@ func (hs *Handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			return
 		}
 
-		reqBodyDataURL, err := url.Parse(reqBodyData.Url)
+		reqBodyDataURL, err := url.Parse(reqBodyData.URL)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
