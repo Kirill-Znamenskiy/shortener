@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/Kirill-Znamenskiy/shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/shortener/internal/storage"
 	"io"
 	"net/http"
@@ -130,6 +131,7 @@ func TestRootHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	cfg := config.LoadEnvConfig()
 	for tstInd, tst := range tests {
 		t.Run("Test "+strconv.Itoa(tstInd+1)+" "+tst.key, func(t *testing.T) {
 			var tstReqBody io.Reader
@@ -149,7 +151,7 @@ func TestRootHandler(t *testing.T) {
 			}
 
 			// определяем хендлер
-			h := MakeMainHandler(stg)
+			h := MakeMainHandler(stg, cfg)
 			// запускаем сервер
 			h.ServeHTTP(w, req)
 			resp := w.Result()
