@@ -13,21 +13,26 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 func MakeMainHandler(stg storage.Storage, cfg *config.Config) http.Handler {
 	hs := &Handlers{stg: stg, cfg: cfg}
 	r := chi.NewRouter()
+
 	r.Use(decompressMiddleware())
 	r.Use(middleware.ContentCharset("", "UTF-8"))
 	r.Use(middleware.Compress(5, "text/html", "application/json"))
-	r.Use(middleware.AllowContentType("", "text/plain", "text/html", "application/json"))
+	//r.Use(middleware.AllowContentType("", "text/plain", "text/html", "application/json"))
+
 	r.Post("/", hs.makeWrapperForJSONHandlerFunc(hs.makeSaveNewURLHandlerFunc()))
 	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
 	r.Get("/{key:[-\\w]+}", hs.makeGetURLHandlerFunc())
+
 	r.HandleFunc("/*", func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Bad Request", http.StatusBadRequest)
 	})
+
 	return r
 }
 
@@ -44,12 +49,27 @@ func decompressMiddleware() func(next http.Handler) http.Handler {
 			case "":
 			case "gzip":
 				reader, err := gzip.NewReader(req.Body)
-				defer req.Body.Close()
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				req.Body = io.NopCloser(reader)
+
+				reqBodyBytes, err := io.ReadAll(reader)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				err = req.Body.Close()
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+
+				req.Body = io.NopCloser(bytes.NewReader(reqBodyBytes))
+				req.ContentLength = int64(len(reqBodyBytes))
+				req.Header.Set("Content-Length", strconv.FormatInt(req.ContentLength, 10))
+				req.Header.Del("Content-Encoding")
 			default:
 				http.Error(w, fmt.Sprintf("Unknown request Content-Encoding: %q", ce), http.StatusInternalServerError)
 				return
@@ -74,7 +94,6 @@ func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) 
 		}
 
 		if isActive {
-			req.Header.Set("Content-Type", "application/json")
 
 			reqBodyCont, err := io.ReadAll(req.Body)
 			if err != nil {
@@ -83,6 +102,8 @@ func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) 
 			}
 			reqBodyCont = []byte(`{"URL":"` + string(reqBodyCont) + `"}`)
 			req.Body = io.NopCloser(bytes.NewReader(reqBodyCont))
+
+			req.Header.Set("Content-Type", "application/json")
 
 			crw := NewCustomResponseWriter()
 			nextJSONHandler.ServeHTTP(crw, req)
@@ -128,8 +149,7 @@ func (hs *Handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			return
 		}
 
-		ct, ctParams, err := mime.ParseMediaType(hContentType)
-		fmt.Println("ctParams", ctParams)
+		ct, _, err := mime.ParseMediaType(hContentType)
 		if err != nil || ct != "application/json" {
 			http.Error(w, "Malformed Content-Type header", http.StatusBadRequest)
 			return
