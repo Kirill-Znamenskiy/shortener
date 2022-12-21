@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"github.com/Kirill-Znamenskiy/shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/shortener/internal/storage"
 	"io"
 	"net/http"
@@ -25,6 +26,7 @@ func TestRootHandler(t *testing.T) {
 		hLocation    string
 		body         string
 	}
+	cfg := config.LoadEnvConfig()
 	tests := []struct {
 		key  string
 		req  request
@@ -40,7 +42,7 @@ func TestRootHandler(t *testing.T) {
 			resp: response{
 				code:         http.StatusCreated,
 				hContentType: "text/plain;charset=UTF-8",
-				body:         `^http://localhost:8080/[-\w]+$`,
+				body:         `^` + cfg.BaseURL + `/[-\w]+$`,
 			},
 		},
 		{
@@ -65,7 +67,7 @@ func TestRootHandler(t *testing.T) {
 			resp: response{
 				code:         http.StatusCreated,
 				hContentType: "application/json;charset=UTF-8",
-				body:         `^\{\"result\"\:\"http://localhost:8080/[-\w]+\"\}$`,
+				body:         `^\{\"result\"\:\"` + cfg.BaseURL + `/[-\w]+\"\}$`,
 			},
 		},
 		{
@@ -149,7 +151,7 @@ func TestRootHandler(t *testing.T) {
 			}
 
 			// определяем хендлер
-			h := MakeMainHandler(stg)
+			h := MakeMainHandler(stg, cfg)
 			// запускаем сервер
 			h.ServeHTTP(w, req)
 			resp := w.Result()

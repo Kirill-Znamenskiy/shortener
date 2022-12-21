@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/Kirill-Znamenskiy/shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/shortener/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -13,8 +14,8 @@ import (
 	"net/url"
 )
 
-func MakeMainHandler(stg storage.Storage) http.Handler {
-	hs := &Handlers{stg: stg}
+func MakeMainHandler(stg storage.Storage, cfg *config.EnvConfig) http.Handler {
+	hs := &Handlers{stg: stg, cfg: cfg}
 	r := chi.NewRouter()
 	r.Use(middleware.ContentCharset("", "UTF-8"))
 	//r.Use(middleware.Compress(5, "text/html", "application/json"))
@@ -30,6 +31,7 @@ func MakeMainHandler(stg storage.Storage) http.Handler {
 
 type Handlers struct {
 	stg storage.Storage
+	cfg *config.EnvConfig
 }
 
 func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) http.HandlerFunc {
@@ -136,7 +138,7 @@ func (hs *Handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			return
 		}
 
-		result := "http://localhost:8080/" + key
+		result := hs.cfg.BaseURL + "/" + key
 
 		respBodyData := new(struct {
 			Result string `json:"result"`
