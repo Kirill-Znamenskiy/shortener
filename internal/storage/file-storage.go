@@ -17,8 +17,7 @@ type FileStorage struct {
 
 func NewFileStorage(filePath string) (ret *FileStorage) {
 	ret = &FileStorage{
-		filePath:        filePath,
-		InMemoryStorage: NewInMemoryStorage(),
+		filePath: filePath,
 	}
 	err := ret.LoadDataFromFile()
 	if err != nil {
@@ -29,7 +28,7 @@ func NewFileStorage(filePath string) (ret *FileStorage) {
 
 func (s *FileStorage) Put(key string, url *url.URL) (retKey string, err error) {
 	retKey, err = s.InMemoryStorage.Put(key, url)
-	if err == nil {
+	if err != nil {
 		return
 	}
 	err = s.SaveDataToFile()
@@ -40,9 +39,6 @@ func (s *FileStorage) LoadDataFromFile() (err error) {
 	s.InMemoryStorage = NewInMemoryStorage()
 
 	file, err := os.Open(s.filePath)
-	if err == os.ErrNotExist {
-		return nil
-	}
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}

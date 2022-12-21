@@ -26,7 +26,7 @@ func TestRootHandler(t *testing.T) {
 		hLocation    string
 		body         string
 	}
-	cfg := config.LoadEnvConfig()
+	cfg := config.LoadFromEnv()
 	tests := []struct {
 		key  string
 		req  request

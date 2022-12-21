@@ -10,7 +10,7 @@ import (
 
 func main() {
 
-	cfg := config.LoadEnvConfig()
+	cfg := config.LoadFromEnv()
 
 	var stg storage.Storage
 	if cfg.StorageFilePath == "" {

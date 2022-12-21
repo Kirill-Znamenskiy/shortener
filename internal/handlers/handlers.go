@@ -14,7 +14,7 @@ import (
 	"net/url"
 )
 
-func MakeMainHandler(stg storage.Storage, cfg *config.EnvConfig) http.Handler {
+func MakeMainHandler(stg storage.Storage, cfg *config.Config) http.Handler {
 	hs := &Handlers{stg: stg, cfg: cfg}
 	r := chi.NewRouter()
 	r.Use(middleware.ContentCharset("", "UTF-8"))
@@ -31,7 +31,7 @@ func MakeMainHandler(stg storage.Storage, cfg *config.EnvConfig) http.Handler {
 
 type Handlers struct {
 	stg storage.Storage
-	cfg *config.EnvConfig
+	cfg *config.Config
 }
 
 func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) http.HandlerFunc {
