@@ -18,7 +18,7 @@ func MakeMainHandler(stg storage.Storage, cfg *config.Config) http.Handler {
 	hs := &Handlers{stg: stg, cfg: cfg}
 	r := chi.NewRouter()
 	r.Use(middleware.ContentCharset("", "UTF-8"))
-	//r.Use(middleware.Compress(5, "text/html", "application/json"))
+	r.Use(middleware.Compress(5, "text/html", "application/json"))
 	r.Use(middleware.AllowContentType("", "text/plain", "text/html", "application/json"))
 	r.Post("/", hs.makeWrapperForJSONHandlerFunc(hs.makeSaveNewURLHandlerFunc()))
 	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
