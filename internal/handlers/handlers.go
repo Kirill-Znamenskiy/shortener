@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"fmt"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
@@ -17,6 +18,7 @@ import (
 func MakeMainHandler(stg storage.Storage, cfg *config.Config) http.Handler {
 	hs := &Handlers{stg: stg, cfg: cfg}
 	r := chi.NewRouter()
+	r.Use(decompressMiddleware())
 	r.Use(middleware.ContentCharset("", "UTF-8"))
 	r.Use(middleware.Compress(5, "text/html", "application/json"))
 	r.Use(middleware.AllowContentType("", "text/plain", "text/html", "application/json"))
@@ -34,6 +36,29 @@ type Handlers struct {
 	cfg *config.Config
 }
 
+func decompressMiddleware() func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+
+			switch ce := req.Header.Get("Content-Encoding"); ce {
+			case "":
+			case "gzip":
+				reader, err := gzip.NewReader(req.Body)
+				defer req.Body.Close()
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+				req.Body = io.NopCloser(reader)
+			default:
+				http.Error(w, fmt.Sprintf("Unknown request Content-Encoding: %q", ce), http.StatusInternalServerError)
+				return
+			}
+
+			next.ServeHTTP(w, req)
+		})
+	}
+}
 func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		hContentType := req.Header.Get("Content-Type")
@@ -42,8 +67,7 @@ func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) 
 		if hContentType == "" {
 			isActive = true
 		} else {
-			ct, ctParams, err := mime.ParseMediaType(hContentType)
-			fmt.Println("ctParams", ctParams)
+			ct, _, err := mime.ParseMediaType(hContentType)
 			if err != nil || ct != "application/json" {
 				isActive = true
 			}
