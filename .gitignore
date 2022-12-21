@@ -23,4 +23,5 @@
 /.idea
 /.vscode
 
-/.tools
+/data
+/tools
