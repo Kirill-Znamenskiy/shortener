@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"bytes"
+	"compress/gzip"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -26,6 +29,20 @@ func TestRootHandler(t *testing.T) {
 		hLocation    string
 		body         string
 	}
+	gzipStringFunc := func(str string) string {
+		var buff bytes.Buffer
+		gzw := gzip.NewWriter(&buff)
+		_, err := gzw.Write([]byte(str))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = gzw.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+		return buff.String()
+	}
 	cfg := config.LoadFromEnv()
 	tests := []struct {
 		key  string
@@ -43,6 +60,36 @@ func TestRootHandler(t *testing.T) {
 				code:         http.StatusCreated,
 				hContentType: "text/plain;charset=UTF-8",
 				body:         `^` + cfg.BaseURL + `/[-\w]+$`,
+			},
+		},
+		{
+			key: "positive",
+			req: request{
+				method:  http.MethodPost,
+				target:  "/",
+				headers: map[string]string{"Accept-Encoding": "gzip"},
+				body:    "https://Kirill.Znamenskiy.me",
+			},
+			resp: response{
+				code:         http.StatusCreated,
+				hContentType: "text/plain;charset=UTF-8",
+			},
+		},
+		{
+			key: "positive",
+			req: request{
+				method: http.MethodPost,
+				target: "/",
+				headers: map[string]string{
+					"Content-Encoding": "gzip",
+					"Accept-Encoding":  "gzip",
+					"Content-Type":     "application/x-gzip",
+				},
+				body: gzipStringFunc("https://Kirill.Znamenskiy.me"),
+			},
+			resp: response{
+				code:         http.StatusCreated,
+				hContentType: "text/plain;charset=UTF-8",
 			},
 		},
 		{
