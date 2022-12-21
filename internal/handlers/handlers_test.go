@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"github.com/Kirill-Znamenskiy/shortener/internal/config"
-	"github.com/Kirill-Znamenskiy/shortener/internal/storage"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -26,7 +26,7 @@ func TestRootHandler(t *testing.T) {
 		hLocation    string
 		body         string
 	}
-	cfg := config.LoadEnvConfig()
+	cfg := config.LoadFromEnv()
 	tests := []struct {
 		key  string
 		req  request
