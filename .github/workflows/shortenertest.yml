@@ -85,7 +85,6 @@ jobs:
           || github.head_ref == 'iter24'
           || github.head_ref == 'sprint1'
           || github.head_ref == 'sprint2'
-          || github.head_ref == 'sprint3'
         run: |
           shortenertest -test.v -test.run=^TestIteration1$ \
               -binary-path=cmd/shortener/shortener
@@ -118,7 +117,6 @@ jobs:
           || github.head_ref == 'iter24'
           || github.head_ref == 'sprint1'
           || github.head_ref == 'sprint2'
-          || github.head_ref == 'sprint3'
         run: |
           shortenertest -test.v -test.run=^TestIteration2$ -source-path=.
 
@@ -149,7 +147,6 @@ jobs:
           || github.head_ref == 'iter24'
           || github.head_ref == 'sprint1'
           || github.head_ref == 'sprint2'
-          || github.head_ref == 'sprint3'
         run: |
           shortenertest -test.v -test.run=^TestIteration3$ -source-path=.
 
@@ -178,7 +175,6 @@ jobs:
           || github.head_ref == 'iter23'
           || github.head_ref == 'iter24'
           || github.head_ref == 'sprint2'
-          || github.head_ref == 'sprint3'
         run: |
           shortenertest -test.v -test.run=^TestIteration4$ \
               -source-path=. \
@@ -207,6 +203,7 @@ jobs:
           || github.head_ref == 'iter22'
           || github.head_ref == 'iter23'
           || github.head_ref == 'iter24'
+          || github.head_ref == 'sprint2'
         run: |
           SERVER_HOST=$(random domain)
           SERVER_PORT=$(random unused-port)
@@ -238,6 +235,7 @@ jobs:
           || github.head_ref == 'iter22'
           || github.head_ref == 'iter23'
           || github.head_ref == 'iter24'
+          || github.head_ref == 'sprint2'
         run: |
           SERVER_PORT=$(random unused-port)
           TEMP_FILE=$(random tempfile)
@@ -268,6 +266,7 @@ jobs:
           || github.head_ref == 'iter22'
           || github.head_ref == 'iter23'
           || github.head_ref == 'iter24'
+          || github.head_ref == 'sprint2'
         run: |
           SERVER_PORT=$(random unused-port)
           TEMP_FILE=$(random tempfile)
@@ -297,6 +296,7 @@ jobs:
           || github.head_ref == 'iter22'
           || github.head_ref == 'iter23'
           || github.head_ref == 'iter24'
+          || github.head_ref == 'sprint2'
         run: |
           shortenertest -test.v -test.run=^TestIteration8$ \
               -source-path=. \
