@@ -1,17 +1,28 @@
 package main
 
 import (
-	"github.com/Kirill-Znamenskiy/shortener/internal/handlers"
-	"github.com/Kirill-Znamenskiy/shortener/internal/storage"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/handlers"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
+	"github.com/spf13/pflag"
 	"log"
 	"net/http"
 )
 
 func main() {
 
-	stg := storage.NewInMemoryStorage()
+	cfg := config.LoadFromEnv()
+	config.DefineFlags(cfg)
+	pflag.Parse()
 
-	mainHandler := handlers.MakeMainHandler(stg)
+	var stg storage.Storage
+	if cfg.StorageFilePath == "" {
+		stg = storage.NewInMemoryStorage()
+	} else {
+		stg = storage.NewFileStorage(cfg.StorageFilePath)
+	}
 
-	log.Fatal(http.ListenAndServe("localhost:8080", mainHandler))
+	mainHandler := handlers.MakeMainHandler(stg, cfg)
+
+	log.Fatal(http.ListenAndServe(cfg.ServerAddress, mainHandler))
 }

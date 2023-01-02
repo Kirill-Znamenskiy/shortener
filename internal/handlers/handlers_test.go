@@ -1,21 +1,27 @@
 package handlers
 
 import (
-	"github.com/Kirill-Znamenskiy/shortener/internal/storage"
+	"bytes"
+	"compress/gzip"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 )
 
 func TestRootHandler(t *testing.T) {
 	type request struct {
-		method string
-		target string
-		body   string
+		method  string
+		target  string
+		body    string
+		headers map[string]string
 	}
 	type response struct {
 		code         int
@@ -23,26 +29,96 @@ func TestRootHandler(t *testing.T) {
 		hLocation    string
 		body         string
 	}
+	gzipStringFunc := func(str string) string {
+		var buff bytes.Buffer
+		gzw := gzip.NewWriter(&buff)
+		_, err := gzw.Write([]byte(str))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		err = gzw.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+		return buff.String()
+	}
+	cfg := config.LoadFromEnv()
 	tests := []struct {
-		name string
+		key  string
 		req  request
 		resp response
 	}{
 		{
-			name: "positive test #1",
+			key: "positive",
 			req: request{
 				method: http.MethodPost,
 				target: "/",
-				body:   "https://Kirill.Znamenskiy.pw",
+				body:   "https://Kirill.Znamenskiy.me",
 			},
 			resp: response{
-				code:         201,
-				hContentType: "text/plain; charset=UTF-8",
-				body:         `^http://localhost:8080/[-\w]+$`,
+				code:         http.StatusCreated,
+				hContentType: "text/plain;charset=UTF-8",
+				body:         `^` + cfg.BaseURL + `/[-\w]+$`,
 			},
 		},
 		{
-			name: "positive test #2",
+			key: "positive",
+			req: request{
+				method:  http.MethodPost,
+				target:  "/",
+				headers: map[string]string{"Accept-Encoding": "gzip"},
+				body:    "https://Kirill.Znamenskiy.me",
+			},
+			resp: response{
+				code:         http.StatusCreated,
+				hContentType: "text/plain;charset=UTF-8",
+			},
+		},
+		{
+			key: "positive",
+			req: request{
+				method: http.MethodPost,
+				target: "/",
+				headers: map[string]string{
+					"Content-Encoding": "gzip",
+					"Accept-Encoding":  "gzip",
+					"Content-Type":     "application/x-gzip",
+				},
+				body: gzipStringFunc("https://Kirill.Znamenskiy.me"),
+			},
+			resp: response{
+				code:         http.StatusCreated,
+				hContentType: "text/plain;charset=UTF-8",
+			},
+		},
+		{
+			key: "negative",
+			req: request{
+				method: http.MethodPost,
+				target: "/api/shorten",
+				body:   `{"URL": "https://Kirill.Znamenskiy.pw"}`,
+			},
+			resp: response{
+				code: http.StatusBadRequest,
+			},
+		},
+		{
+			key: "positive",
+			req: request{
+				method:  http.MethodPost,
+				target:  "/api/shorten",
+				body:    `{"URL": "https://Kirill.Znamenskiy.pw"}`,
+				headers: map[string]string{"Content-Type": "application/json;charset=UTF-8"},
+			},
+			resp: response{
+				code:         http.StatusCreated,
+				hContentType: "application/json;charset=UTF-8",
+				body:         `^\{\"result\"\:\"` + cfg.BaseURL + `/[-\w]+\"\}$`,
+			},
+		},
+		{
+			key: "positive",
 			req: request{
 				method: http.MethodGet,
 				target: "/positive-test-2",
@@ -52,46 +128,45 @@ func TestRootHandler(t *testing.T) {
 				hLocation: "https://Kirill.Znamenskiy.pw",
 			},
 		},
-
 		{
-			name: "negative test #1",
+			key: "negative",
 			req: request{
 				method: http.MethodHead,
 				target: "/",
 			},
 			resp: response{
-				code: 400,
+				code: http.StatusBadRequest,
 			},
 		},
 		{
-			name: "negative test #2",
+			key: "negative",
 			req: request{
 				method: http.MethodGet,
 				target: "/",
 			},
 			resp: response{
-				code: 400,
+				code: http.StatusBadRequest,
 			},
 		},
 		{
-			name: "negative test #3",
+			key: "negative",
 			req: request{
 				method: http.MethodGet,
 				target: "/adgg",
 			},
 			resp: response{
-				code: 400,
+				code: http.StatusBadRequest,
 			},
 		},
 		{
-			name: "negative test #4",
+			key: "negative",
 			req: request{
 				method: http.MethodPost,
 				target: "/",
 				body:   ":ht3240dfkk",
 			},
 			resp: response{
-				code: 400,
+				code: http.StatusBadRequest,
 			},
 		},
 	}
@@ -100,9 +175,12 @@ func TestRootHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stg.Put("positive-test-2", u)
-	for _, tst := range tests {
-		t.Run(tst.name, func(t *testing.T) {
+	_, err = stg.Put("positive-test-2", u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for tstInd, tst := range tests {
+		t.Run("Test "+strconv.Itoa(tstInd+1)+" "+tst.key, func(t *testing.T) {
 			var tstReqBody io.Reader
 			if tst.req.body != "" {
 				tstReqBody = strings.NewReader(tst.req.body)
@@ -112,9 +190,15 @@ func TestRootHandler(t *testing.T) {
 			w := httptest.NewRecorder()
 
 			req := httptest.NewRequest(tst.req.method, tst.req.target, tstReqBody)
+			//if tst.req.headers == nil {
+			//	tst.req.headers = map[string]string{"Content-Type": "text/html;charset=UTF-8"}
+			//}
+			for hName, hValue := range tst.req.headers {
+				req.Header.Set(hName, hValue)
+			}
 
 			// определяем хендлер
-			h := MakeMainHandler(stg)
+			h := MakeMainHandler(stg, cfg)
 			// запускаем сервер
 			h.ServeHTTP(w, req)
 			resp := w.Result()
@@ -140,11 +224,11 @@ func TestRootHandler(t *testing.T) {
 				respBodyString := string(respBodyBytes)
 				if rgxp, err := regexp.Compile(tst.resp.body); err == nil {
 					if !rgxp.Match(respBodyBytes) {
-						t.Errorf("Expected body match pattern %s, got %s", tst.resp.body, respBodyBytes)
+						t.Errorf("Expected Body match pattern %s, got %s", tst.resp.body, respBodyBytes)
 					}
 				} else {
 					if respBodyString != tst.resp.body {
-						t.Errorf("Expected body %s, got %s", tst.resp.body, respBodyBytes)
+						t.Errorf("Expected Body %s, got %s", tst.resp.body, respBodyBytes)
 					}
 				}
 			}

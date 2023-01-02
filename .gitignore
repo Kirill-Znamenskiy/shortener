@@ -12,12 +12,15 @@
 *.out
 
 # Binaries
-cmd/shortener/main
-cmd/shortener/shortener
+/cmd/shortener/main
+/cmd/shortener/shortener
+/cmd/tst
 
 # Dependency directories (remove the comment below to include it)
-vendor/
+/vendor
 
 # IDEs directories
-.idea
-.vscode
+/.idea
+/.vscode
+
+/aux
