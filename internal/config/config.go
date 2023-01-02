@@ -15,9 +15,9 @@ import (
 )
 
 type Config struct {
-	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080" flagName:"server-address" flagShortName:"a" flagUsage:"server address"`
-	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080" flagName:"base-url" flagShortName:"b" flagUsage:"base url"`
-	StorageFilePath string `env:"FILE_STORAGE_PATH" flagName:"storage-file-path" flagShortName:"f" flagUsage:"storage file path"`
+	ServerAddress   string `env:"SERVER_ADDRESS,default=localhost:8080" flag:"server-address a" desc:"(env SERVER_ADDRESS) server address"`
+	BaseURL         string `env:"BASE_URL,default=http://localhost:8080" flag:"base-url b" desc:"(env BASE_URL) base url"`
+	StorageFilePath string `env:"FILE_STORAGE_PATH,default=localhost:8080" flag:"storage-file-path f" desc:"(env FILE_STORAGE_PATH) storage file path"`
 	stg             storage.Storage
 }
 
