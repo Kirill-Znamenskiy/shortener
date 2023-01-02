@@ -26,8 +26,8 @@ func NewFileStorage(filePath string) (ret *FileStorage) {
 	return
 }
 
-func (s *FileStorage) Put(key string, url *url.URL) (retKey string, err error) {
-	retKey, err = s.InMemoryStorage.Put(key, url)
+func (s *FileStorage) Put(key string, url *url.URL) (err error) {
+	err = s.InMemoryStorage.Put(key, url)
 	if err != nil {
 		return
 	}

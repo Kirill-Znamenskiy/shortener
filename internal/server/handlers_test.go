@@ -1,8 +1,10 @@
-package handlers
+package server
 
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"fmt"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"io"
@@ -11,7 +13,6 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
-	"strconv"
 	"strings"
 	"testing"
 )
@@ -43,8 +44,9 @@ func TestRootHandler(t *testing.T) {
 		}
 		return buff.String()
 	}
-	cfg := config.LoadFromEnv()
-	tests := []struct {
+	cfg := new(config.Config)
+	config.LoadFromEnv(context.TODO(), cfg)
+	tkits := []struct {
 		key  string
 		req  request
 		resp response
@@ -155,7 +157,7 @@ func TestRootHandler(t *testing.T) {
 				target: "/adgg",
 			},
 			resp: response{
-				code: http.StatusBadRequest,
+				code: http.StatusNotFound,
 			},
 		},
 		{
@@ -166,7 +168,7 @@ func TestRootHandler(t *testing.T) {
 				body:   ":ht3240dfkk",
 			},
 			resp: response{
-				code: http.StatusBadRequest,
+				code: http.StatusInternalServerError,
 			},
 		},
 	}
@@ -175,60 +177,61 @@ func TestRootHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = stg.Put("positive-test-2", u)
+	err = stg.Put("positive-test-2", u)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for tstInd, tst := range tests {
-		t.Run("Test "+strconv.Itoa(tstInd+1)+" "+tst.key, func(t *testing.T) {
+	cfg.SetStorage(stg)
+	for tind, tkit := range tkits {
+		t.Run(fmt.Sprintf("Test %d %s", tind+1, tkit.key), func(t *testing.T) {
 			var tstReqBody io.Reader
-			if tst.req.body != "" {
-				tstReqBody = strings.NewReader(tst.req.body)
+			if tkit.req.body != "" {
+				tstReqBody = strings.NewReader(tkit.req.body)
 			}
 
 			// создаём новый Recorder
 			w := httptest.NewRecorder()
 
-			req := httptest.NewRequest(tst.req.method, tst.req.target, tstReqBody)
-			//if tst.req.headers == nil {
-			//	tst.req.headers = map[string]string{"Content-Type": "text/html;charset=UTF-8"}
+			req := httptest.NewRequest(tkit.req.method, tkit.req.target, tstReqBody)
+			//if tkit.req.headers == nil {
+			//	tkit.req.headers = map[string]string{"Content-Type": "text/html;charset=UTF-8"}
 			//}
-			for hName, hValue := range tst.req.headers {
+			for hName, hValue := range tkit.req.headers {
 				req.Header.Set(hName, hValue)
 			}
 
 			// определяем хендлер
-			h := MakeMainHandler(stg, cfg)
+			h := MakeMainHandler(cfg)
 			// запускаем сервер
 			h.ServeHTTP(w, req)
 			resp := w.Result()
 			defer resp.Body.Close()
 
 			// проверяем код ответа
-			if resp.StatusCode != tst.resp.code {
-				t.Errorf("Expected status code %d, got %d", tst.resp.code, w.Code)
+			if resp.StatusCode != tkit.resp.code {
+				t.Errorf("Expected status code %d, got %d", tkit.resp.code, w.Code)
 			}
 
-			if tst.resp.hContentType != "" && resp.Header.Get("Content-Type") != tst.resp.hContentType {
-				t.Errorf("Expected Content-Type %s, got %s", tst.resp.hContentType, resp.Header.Get("Content-Type"))
+			if tkit.resp.hContentType != "" && resp.Header.Get("Content-Type") != tkit.resp.hContentType {
+				t.Errorf("Expected Content-Type %s, got %s", tkit.resp.hContentType, resp.Header.Get("Content-Type"))
 			}
-			if tst.resp.hLocation != "" && resp.Header.Get("Location") != tst.resp.hLocation {
-				t.Errorf("Expected Location %s, got %s", tst.resp.hLocation, resp.Header.Get("Location"))
+			if tkit.resp.hLocation != "" && resp.Header.Get("Location") != tkit.resp.hLocation {
+				t.Errorf("Expected Location %s, got %s", tkit.resp.hLocation, resp.Header.Get("Location"))
 			}
 
-			if tst.resp.body != "" {
+			if tkit.resp.body != "" {
 				respBodyBytes, err := io.ReadAll(resp.Body)
 				if err != nil {
 					t.Fatal(err)
 				}
 				respBodyString := string(respBodyBytes)
-				if rgxp, err := regexp.Compile(tst.resp.body); err == nil {
+				if rgxp, err := regexp.Compile(tkit.resp.body); err == nil {
 					if !rgxp.Match(respBodyBytes) {
-						t.Errorf("Expected Body match pattern %s, got %s", tst.resp.body, respBodyBytes)
+						t.Errorf("Expected Body match pattern %s, got %s", tkit.resp.body, respBodyBytes)
 					}
 				} else {
-					if respBodyString != tst.resp.body {
-						t.Errorf("Expected Body %s, got %s", tst.resp.body, respBodyBytes)
+					if respBodyString != tkit.resp.body {
+						t.Errorf("Expected Body %s, got %s", tkit.resp.body, respBodyBytes)
 					}
 				}
 			}

@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"github.com/Kirill-Znamenskiy/Shortener/pkg/kztests"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"net/url"
 	"testing"
 )
@@ -12,7 +14,7 @@ func makeDefaultStorage(t *testing.T) Storage {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = stg.Put("shortid", u)
+	err = stg.Put("shortid", u)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,89 +23,43 @@ func makeDefaultStorage(t *testing.T) Storage {
 }
 
 func TestInMemoryStorage_Get(t *testing.T) {
-	tests := []struct {
-		name     string
-		argKey   string
-		wantURL  string
-		wantIsOk bool
-	}{
-		{
-			name:     "test#1",
-			argKey:   "shortid",
-			wantIsOk: true,
-			wantURL:  "https://Kirill.Znamenskiy.pw",
-		},
-		{
-			name:     "test#2",
-			argKey:   "aaaa",
-			wantIsOk: false,
-			wantURL:  "",
-		},
-		{
-			name:     "test#3",
-			argKey:   "",
-			wantIsOk: false,
-			wantURL:  "",
-		},
-	}
 	stg := makeDefaultStorage(t)
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotURL, gotIsOk := stg.Get(tt.argKey)
-			assert.Equal(t, tt.wantIsOk, gotIsOk)
-			gotURLString := ""
-			if gotURL != nil {
-				gotURLString = gotURL.String()
-			}
-			assert.Equal(t, tt.wantURL, gotURLString)
-		})
+	functions := stg.Get
+	makeCheckResult1Func := func(expectedURL string) any {
+		return func(t *testing.T, resURL *url.URL) bool {
+			return resURL.String() == expectedURL
+		}
 	}
+	testKits := []kztests.TestKit{
+		{Arg: "shortid", Result1: makeCheckResult1Func("https://Kirill.Znamenskiy.pw"), Result2: true},
+		{Arg: "aaa", Result1: assert.Nil, Result2: false},
+		{Arg: "", Result1: assert.Nil, Result2: false},
+	}
+	kztests.RunTests(t, functions, testKits)
 }
 
 func TestInMemoryStorage_Put(t *testing.T) {
-	tests := []struct {
-		name   string
-		argKey string
-		argURL string
-		want   string
-	}{
-		{
-			name:   "test#1",
-			argKey: "aaa",
-			argURL: "abfasb",
-			want:   "aaa",
-		},
-		{
-			name:   "test#2",
-			argKey: "bbb",
-			argURL: "http://abfasb.org",
-			want:   "bbb",
-		},
-		{
-			name:   "test#2",
-			argKey: "ccc",
-			argURL: "",
-			want:   "ccc",
-		},
-	}
 	stg := makeDefaultStorage(t)
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			u, err := url.Parse(tt.argURL)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			got, err := stg.Put(tt.argKey, u)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
+	functions := stg.Put
+	makeParseURLFunc := func(urlStr string) *url.URL {
+		ret, err := url.Parse(urlStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return ret
 	}
+	testKits := []kztests.TestKit{
+		{Arg1: "aaa", Arg2: makeParseURLFunc("asdfas"), Result: assert.NoError},
+		{Arg1: "bbb", Arg2: makeParseURLFunc("http://abfasb.org"), Result: assert.NoError},
+		{Arg1: "ccc", Arg2: makeParseURLFunc(""), Result: assert.NoError},
+		{Arg1: "ccc", Arg2: makeParseURLFunc("xxx"), Result: assert.Error},
+	}
+	kztests.RunTests(t, functions, testKits)
 }
 
 func TestNewInMemoryStorage(t *testing.T) {
-	t.Run("test#1", func(t *testing.T) {
-		got := NewInMemoryStorage()
-		assert.Empty(t, got.key2url)
+	t.Run("Test 1", func(t *testing.T) {
+		res := NewInMemoryStorage()
+		assert.Empty(t, res.key2url)
 	})
 }

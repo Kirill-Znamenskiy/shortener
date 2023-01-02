@@ -1,28 +1,21 @@
 package main
 
 import (
+	"context"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
-	"github.com/Kirill-Znamenskiy/Shortener/internal/handlers"
-	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
-	"github.com/spf13/pflag"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/server"
 	"log"
-	"net/http"
 )
 
 func main() {
 
-	cfg := config.LoadFromEnv()
-	config.DefineFlags(cfg)
-	pflag.Parse()
+	ctx := context.Background()
 
-	var stg storage.Storage
-	if cfg.StorageFilePath == "" {
-		stg = storage.NewInMemoryStorage()
-	} else {
-		stg = storage.NewFileStorage(cfg.StorageFilePath)
-	}
+	cfg := new(config.Config)
+	config.LoadFromEnv(ctx, cfg)
+	config.ParseFlags(cfg)
 
-	mainHandler := handlers.MakeMainHandler(stg, cfg)
+	log.Printf("Now run API server with config: %s\n", config.ToPrettyString(cfg))
 
-	log.Fatal(http.ListenAndServe(cfg.ServerAddress, mainHandler))
+	server.Run(cfg)
 }

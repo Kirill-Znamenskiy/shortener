@@ -1,7 +1,7 @@
 package storage
 
 import (
-	"github.com/teris-io/shortid"
+	"fmt"
 	"net/url"
 )
 
@@ -15,34 +15,15 @@ func NewInMemoryStorage() *InMemoryStorage {
 	}
 }
 
-func (s *InMemoryStorage) Put(key string, url *url.URL) (retKey string, err error) {
-	if key == "" {
-		key, err = s.GenerateNewKey()
-		if err != nil {
-			return
-		}
+func (s *InMemoryStorage) Put(key string, url *url.URL) (err error) {
+	if _, isOk := s.Get(key); isOk {
+		return fmt.Errorf("key %q already exists", key)
 	}
 	s.key2url[key] = url
-	retKey = key
 	return
 }
 
 func (s *InMemoryStorage) Get(key string) (url *url.URL, isOk bool) {
 	url, isOk = s.key2url[key]
-	return
-}
-
-func (s *InMemoryStorage) GenerateNewKey() (ret string, err error) {
-	for {
-		ret, err = shortid.Generate()
-		if err != nil {
-			return
-		}
-		if _, isOk := s.Get(ret); isOk {
-			continue
-		}
-		break
-	}
-
 	return
 }
