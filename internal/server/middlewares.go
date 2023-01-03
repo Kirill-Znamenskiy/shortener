@@ -3,8 +3,13 @@ package server
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
+	"errors"
 	"fmt"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"path"
@@ -87,6 +92,60 @@ func CleanURLPathMiddleware() func(next http.Handler) http.Handler {
 			r.URL.Path = res
 
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+func AuthUserMiddleware(cfg *config.Config, generateNewUserUUIDFunc func() (*uuid.UUID, error)) func(next http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			var userCookieValue string
+			userCookie, err := r.Cookie(cfg.UserCookieName)
+			if err != nil {
+				if errors.Is(err, http.ErrNoCookie) {
+					userCookieValue = ""
+				} else {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			} else {
+				userCookieValue = userCookie.Value
+			}
+
+			cfgSecretKey, err := cfg.GetSecretKey()
+			if checkErrorAsInternalServerError(w, err) {
+				return
+			}
+
+			var userUUID *uuid.UUID
+			if userCookieValue != "" {
+				userUUID, err = crypto.DecryptSignedUsedUUID([]byte(userCookieValue), cfgSecretKey)
+				if err != nil {
+					userUUID = nil
+				}
+			}
+			if userUUID == nil {
+				userUUID, err = generateNewUserUUIDFunc()
+				if checkErrorAsInternalServerError(w, err) {
+					return
+				}
+			}
+
+			r = r.WithContext(context.WithValue(r.Context(), myString("ptrToUserUUID"), userUUID))
+
+			next.ServeHTTP(w, r)
+
+			userUUIDEncryptedAndSigned, err := crypto.EncryptAndSignUserUUID(userUUID, cfgSecretKey)
+			if checkErrorAsInternalServerError(w, err) {
+				return
+			}
+
+			http.SetCookie(w, &http.Cookie{
+				Name:  cfg.UserCookieName,
+				Value: string(userUUIDEncryptedAndSigned),
+			})
+
 		})
 	}
 }

@@ -6,7 +6,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
-	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
+	"github.com/google/uuid"
 	"io"
 	"log"
 	"net/http"
@@ -46,6 +47,25 @@ func TestRootHandler(t *testing.T) {
 	}
 	cfg := new(config.Config)
 	config.LoadFromEnv(context.TODO(), cfg)
+
+	cfgSecretKey, err := cfg.GetSecretKey()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	tmp := uuid.New()
+	userUUID := &tmp
+
+	userUUIDEncryptedAndSigned, err := crypto.EncryptAndSignUserUUID(userUUID, cfgSecretKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userUUIDCookie := http.Cookie{
+		Name:  cfg.UserCookieName,
+		Value: string(userUUIDEncryptedAndSigned),
+	}
+
 	tkits := []struct {
 		key  string
 		req  request
@@ -122,8 +142,9 @@ func TestRootHandler(t *testing.T) {
 		{
 			key: "positive",
 			req: request{
-				method: http.MethodGet,
-				target: "/positive-test-2",
+				method:  http.MethodGet,
+				target:  "/positive-test-2",
+				headers: map[string]string{"Cookie": userUUIDCookie.String()},
 			},
 			resp: response{
 				code:      http.StatusTemporaryRedirect,
@@ -171,17 +192,37 @@ func TestRootHandler(t *testing.T) {
 				code: http.StatusInternalServerError,
 			},
 		},
+		{
+			key: "positive",
+			req: request{
+				method: http.MethodGet,
+				target: "/api/user/urls",
+			},
+			resp: response{
+				code: http.StatusNoContent,
+			},
+		},
+		{
+			key: "positive",
+			req: request{
+				method:  http.MethodGet,
+				target:  "/api/user/urls",
+				headers: map[string]string{"Cookie": userUUIDCookie.String()},
+			},
+			resp: response{
+				code: http.StatusOK,
+				body: `{"short_url":"` + cfg.BaseURL + `/positive-test-2","original_url":"https://Kirill.Znamenskiy.pw"}`,
+			},
+		},
 	}
-	stg := storage.NewInMemoryStorage()
 	u, err := url.Parse("https://Kirill.Znamenskiy.pw")
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = stg.Put("positive-test-2", u)
+	err = cfg.GetStorage().Put(userUUID, "positive-test-2", u)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.SetStorage(stg)
 	for tind, tkit := range tkits {
 		t.Run(fmt.Sprintf("Test %d %s", tind+1, tkit.key), func(t *testing.T) {
 			var tstReqBody io.Reader

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"github.com/google/uuid"
 	"io"
 	"log"
 	"net/url"
@@ -26,13 +27,26 @@ func NewFileStorage(filePath string) (ret *FileStorage) {
 	return
 }
 
-func (s *FileStorage) Put(key string, url *url.URL) (err error) {
-	err = s.InMemoryStorage.Put(key, url)
+func (s *FileStorage) PutSecretKey(secretKey []byte) (err error) {
+	err = s.InMemoryStorage.PutSecretKey(secretKey)
 	if err != nil {
 		return
 	}
 	err = s.SaveDataToFile()
 	return
+}
+func (s *FileStorage) Put(userUUID *uuid.UUID, recordKey string, url *url.URL) (err error) {
+	err = s.InMemoryStorage.Put(userUUID, recordKey, url)
+	if err != nil {
+		return
+	}
+	err = s.SaveDataToFile()
+	return
+}
+
+type inFileData struct {
+	SecretKey              []byte
+	UserUUID2RecordKey2URL map[uuid.UUID]map[string]*url.URL
 }
 
 func (s *FileStorage) LoadDataFromFile() (err error) {
@@ -54,20 +68,22 @@ func (s *FileStorage) LoadDataFromFile() (err error) {
 	}
 
 	if len(toLoadBytes) > 0 {
-		err = json.Unmarshal(toLoadBytes, &s.InMemoryStorage.key2url)
+		var toLoadData inFileData
+		err = json.Unmarshal(toLoadBytes, &toLoadData)
 		if err != nil {
 			return
 		}
+		err = s.InMemoryStorage.PutSecretKey(toLoadData.SecretKey)
+		if err != nil {
+			return
+		}
+		s.InMemoryStorage.setSrcMap(toLoadData.UserUUID2RecordKey2URL)
 	}
 
 	return
 }
 
 func (s *FileStorage) SaveDataToFile() (err error) {
-	toSaveData := s.InMemoryStorage.key2url
-	if len(toSaveData) == 0 {
-		return
-	}
 
 	file, err := os.OpenFile(s.filePath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
@@ -75,7 +91,14 @@ func (s *FileStorage) SaveDataToFile() (err error) {
 	}
 	defer file.Close()
 
-	toSaveBytes, err := json.Marshal(&toSaveData)
+	toSaveData := new(inFileData)
+	toSaveData.SecretKey = s.InMemoryStorage.GetSecretKey()
+	toSaveData.UserUUID2RecordKey2URL = s.InMemoryStorage.getSrcMap()
+	if len(toSaveData.SecretKey) == 0 && len(toSaveData.UserUUID2RecordKey2URL) == 0 {
+		return
+	}
+
+	toSaveBytes, err := json.Marshal(toSaveData)
 	if err != nil {
 		return
 	}
