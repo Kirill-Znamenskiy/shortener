@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -38,7 +39,7 @@ func (s *DBStorage) init() (err error) {
 	_, err = s.dbconn.Exec(`
 		CREATE TABLE IF NOT EXISTS records(
 			key VARCHAR(32) PRIMARY KEY,
-            original_url TEXT NOT NULL,
+            original_url TEXT NOT NULL UNIQUE,
 			usr UUID NOT NULL
 		);
 	`)
@@ -108,14 +109,35 @@ func (s *DBStorage) PutRecords(records []*btypes.Record) (err error) {
 	}
 	defer tx.Rollback()
 
+	var key2record map[string]*btypes.Record
+	var insertedRecord *btypes.Record
+
 	for _, record := range records {
-		_, err = tx.Exec(`
+		key2record, err = s.extractKey2RecordFromRows(tx.Query(`
 			INSERT INTO records
 				(key, original_url, usr)
 			VALUES
 				($1, $2, $3)
-		`, record.Key, record.OriginalURL, record.User)
+			ON CONFLICT (original_url)
+			DO UPDATE SET
+				original_url = EXCLUDED.original_url
+			RETURNING key, original_url, usr
+		`, record.Key, record.OriginalURL, record.User))
 		if err != nil {
+			return
+		}
+
+		if len(key2record) != 1 {
+			err = fmt.Errorf("unexpected situation")
+			return
+		}
+
+		for _, r := range key2record {
+			insertedRecord = r
+		}
+
+		if insertedRecord.Key != record.Key {
+			err = NewDuplicateError(record, insertedRecord)
 			return
 		}
 	}

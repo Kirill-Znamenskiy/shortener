@@ -101,7 +101,7 @@ func TestRootHandler(t *testing.T) {
 				method:  http.MethodPost,
 				target:  "/",
 				headers: map[string]string{"Accept-Encoding": "gzip"},
-				body:    "https://Kirill.Znamenskiy.me",
+				body:    "https://Kirill.Znamenskiy.me/111",
 			},
 			resp: response{
 				code:         http.StatusCreated,
@@ -118,7 +118,7 @@ func TestRootHandler(t *testing.T) {
 					"Accept-Encoding":  "gzip",
 					"Content-Type":     "application/x-gzip",
 				},
-				body: gzipStringFunc("https://Kirill.Znamenskiy.me"),
+				body: gzipStringFunc("https://Kirill.Znamenskiy.me/222"),
 			},
 			resp: response{
 				code:         http.StatusCreated,
@@ -146,6 +146,20 @@ func TestRootHandler(t *testing.T) {
 			},
 			resp: response{
 				code:         http.StatusCreated,
+				hContentType: "application/json;charset=UTF-8",
+				body:         `^\{\"result\"\:\"` + cfg.BaseURL + `/[-\w]+\"\}$`,
+			},
+		},
+		{
+			key: "positive",
+			req: request{
+				method:  http.MethodPost,
+				target:  "/api/shorten",
+				body:    `{"OriginalURL": "https://Kirill.Znamenskiy.pw"}`,
+				headers: map[string]string{"Content-Type": "application/json;charset=UTF-8"},
+			},
+			resp: response{
+				code:         http.StatusConflict,
 				hContentType: "application/json;charset=UTF-8",
 				body:         `^\{\"result\"\:\"` + cfg.BaseURL + `/[-\w]+\"\}$`,
 			},

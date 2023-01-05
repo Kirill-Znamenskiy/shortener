@@ -8,6 +8,7 @@ import (
 	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"io"
@@ -154,7 +155,17 @@ func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			return
 		}
 
+		respCode := http.StatusCreated
+
 		record, err := hs.shortener.SaveNewURL(user, reqData.URL)
+		if err != nil {
+			dupErr := new(storage.DuplicateError)
+			if errors.As(err, &dupErr) {
+				respCode = http.StatusConflict
+				record = dupErr.AlreadyRecord
+				err = nil
+			}
+		}
 		if checkErrorAsInternalServerError(w, err) {
 			return
 		}
@@ -169,7 +180,7 @@ func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			return
 		}
 
-		finishHandler(w, respData, http.StatusCreated)
+		finishHandler(w, respData, respCode)
 	}
 }
 
