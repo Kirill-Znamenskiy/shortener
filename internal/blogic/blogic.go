@@ -29,25 +29,40 @@ func (sh *Shortener) BuildShortURL(record *btypes.Record) (recordShortURL string
 
 // SaveNewURL save new url in storage.
 func (sh *Shortener) SaveNewURL(user *uuid.UUID, urlStr string) (ret *btypes.Record, err error) {
-	record := new(btypes.Record)
-	record.User = user
-
-	record.OriginalURL, err = url.Parse(urlStr)
+	tmp, err := sh.BatchSaveNewURL(user, []string{urlStr})
 	if err != nil {
 		return
 	}
+	ret = tmp[0]
+	return
+}
 
-	record.Key, err = sh.GenerateNewRecordKey()
-	if err != nil {
-		return
+// BatchSaveNewURL save batch or new urls in storage.
+func (sh *Shortener) BatchSaveNewURL(user *uuid.UUID, urls []string) (records []*btypes.Record, err error) {
+	records = make([]*btypes.Record, len(urls))
+	for ind, urlStr := range urls {
+
+		record := new(btypes.Record)
+		record.User = user
+
+		record.OriginalURL, err = url.Parse(urlStr)
+		if err != nil {
+			return nil, err
+		}
+
+		record.Key, err = sh.GenerateNewRecordKey()
+		if err != nil {
+			return nil, err
+		}
+
+		records[ind] = record
 	}
 
-	err = sh.stg.PutRecord(record)
+	err = sh.stg.PutRecords(records)
 	if err != nil {
-		return
+		return nil, err
 	}
 
-	ret = record
 	return
 }
 

@@ -44,6 +44,7 @@ func MakeMainHandler(cfg *config.Config) http.Handler {
 
 	r.Post("/", hs.makeWrapperForJSONHandlerFunc(hs.makeSaveNewURLHandlerFunc()))
 	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
+	r.Post("/api/shorten/batch", hs.makeBatchSaveNewURLHandlerFunc())
 
 	r.Get("/{key:[-\\w]+}", hs.makeGetURLHandlerFunc())
 
@@ -162,6 +163,68 @@ func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			Result string `json:"result"`
 		})
 		respData.Result = hs.shortener.BuildShortURL(record)
+
+		err = hs.setUserCookie(user, w)
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
+
+		finishHandler(w, respData, http.StatusCreated)
+	}
+}
+
+func (hs *handlers) makeBatchSaveNewURLHandlerFunc() http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		hContentType := req.Header.Get("Content-Type")
+		if hContentType == "" {
+			http.Error(w, "Malformed Content-Type header", http.StatusBadRequest)
+			return
+		}
+
+		ct, _, err := mime.ParseMediaType(hContentType)
+		if err != nil || ct != ApplicationJSON {
+			http.Error(w, "Malformed Content-Type header", http.StatusBadRequest)
+			return
+		}
+
+		reqBodyBytes, err := io.ReadAll(req.Body)
+		if checkErrorAsBadRequest(w, err) {
+			return
+		}
+
+		reqData := make([]struct {
+			CorrelationID string `json:"correlation_id"`
+			OriginalURL   string `json:"original_url"`
+		}, 0)
+		err = json.Unmarshal(reqBodyBytes, &reqData)
+		if checkErrorAsBadRequest(w, err) {
+			return
+		}
+
+		user, err := hs.extractUser(req)
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
+
+		urls := make([]string, len(reqData))
+		for ind, rd := range reqData {
+			urls[ind] = rd.OriginalURL
+		}
+
+		records, err := hs.shortener.BatchSaveNewURL(user, urls)
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
+
+		respData := make([]struct {
+			CorrelationID string `json:"correlation_id"`
+			ShortURL      string `json:"short_url"`
+		}, len(reqData))
+
+		for ind, rd := range reqData {
+			respData[ind].CorrelationID = rd.CorrelationID
+			respData[ind].ShortURL = hs.shortener.BuildShortURL(records[ind])
+		}
 
 		err = hs.setUserCookie(user, w)
 		if checkErrorAsInternalServerError(w, err) {
