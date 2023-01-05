@@ -33,8 +33,8 @@ func (s *FileStorage) PutSecretKey(secretKey []byte) (err error) {
 	err = s.SaveDataToFile()
 	return
 }
-func (s *FileStorage) PutRecord(r *btypes.Record) (err error) {
-	err = s.InMemoryStorage.PutRecord(r)
+func (s *FileStorage) PutRecords(r []*btypes.Record) (err error) {
+	err = s.InMemoryStorage.PutRecords(r)
 	if err != nil {
 		return
 	}

@@ -99,13 +99,28 @@ func (s *DBStorage) GetSecretKey() (secretKey []byte, err error) {
 }
 
 func (s *DBStorage) PutRecord(record *btypes.Record) (err error) {
-	_, err = s.dbconn.Exec(`
-		INSERT INTO records
-		    (key, original_url, usr)
-		VALUES
-		    ($1, $2, $3)
-	`, record.Key, record.OriginalURL, record.User)
-	return
+	return s.PutRecords([]*btypes.Record{record})
+}
+func (s *DBStorage) PutRecords(records []*btypes.Record) (err error) {
+	tx, err := s.dbconn.Begin()
+	if err != nil {
+		return
+	}
+	defer tx.Rollback()
+
+	for _, record := range records {
+		_, err = tx.Exec(`
+			INSERT INTO records
+				(key, original_url, usr)
+			VALUES
+				($1, $2, $3)
+		`, record.Key, record.OriginalURL, record.User)
+		if err != nil {
+			return
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (s *DBStorage) GetRecord(key string) (rec *btypes.Record, err error) {
