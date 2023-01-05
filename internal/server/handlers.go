@@ -5,8 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic"
-	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"io"
@@ -39,12 +40,13 @@ func MakeMainHandler(cfg *config.Config) http.Handler {
 
 	r.Use(middleware.AllowContentType("", TextHTML, TextPlain, ApplicationJSON))
 
-	r.Use(AuthUserMiddleware(cfg, shortener.GenerateNewUser))
+	//r.Use(AuthUserMiddleware(cfg, shortener.GenerateNewUser))
 
 	r.Post("/", hs.makeWrapperForJSONHandlerFunc(hs.makeSaveNewURLHandlerFunc()))
+	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
+
 	r.Get("/{key:[-\\w]+}", hs.makeGetURLHandlerFunc())
 
-	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
 	r.Get("/api/user/urls", hs.makeGetUserURLsHandlerFunc())
 
 	r.Get("/ping", hs.makeGetPingHandlerFunc())
@@ -146,12 +148,12 @@ func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			return
 		}
 
-		userUUID, err := extractUser(req)
+		user, err := hs.extractUser(req)
 		if checkErrorAsInternalServerError(w, err) {
 			return
 		}
 
-		record, err := hs.shortener.SaveNewURL(userUUID, reqData.URL)
+		record, err := hs.shortener.SaveNewURL(user, reqData.URL)
 		if checkErrorAsInternalServerError(w, err) {
 			return
 		}
@@ -160,6 +162,11 @@ func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			Result string `json:"result"`
 		})
 		respData.Result = hs.shortener.BuildShortURL(record)
+
+		err = hs.setUserCookie(user, w)
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
 
 		finishHandler(w, respData, http.StatusCreated)
 	}
@@ -180,11 +187,19 @@ func (hs *handlers) makeGetURLHandlerFunc() http.HandlerFunc {
 
 func (hs *handlers) makeGetUserURLsHandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		user, err := extractUser(req)
+		user, err := hs.extractUser(req)
 		if checkErrorAsInternalServerError(w, err) {
 			return
 		}
-		allUserRecords := hs.shortener.GetAllUserRecords(user)
+		allUserRecords, err := hs.shortener.GetAllUserRecords(user)
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
+
+		err = hs.setUserCookie(user, w)
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
 
 		if len(allUserRecords) == 0 {
 			w.WriteHeader(http.StatusNoContent)
@@ -208,6 +223,7 @@ func (hs *handlers) makeGetPingHandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		err := hs.cfg.GetStorage().Ping()
 		if checkErrorAsInternalServerError(w, err) {
+			log.Println(err)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
@@ -231,15 +247,62 @@ func checkError(w http.ResponseWriter, err error, respHTTPCode int) bool {
 	return false
 }
 
-type myString string
+//type myString string
+//
+//const userContextValueKey myString = "user"
 
-const userContextValueKey myString = "user"
+func (hs *handlers) extractUser(req *http.Request) (usr btypes.User, err error) {
 
-func extractUser(req *http.Request) (ret types.User, err error) {
-	ret, isOk := req.Context().Value(userContextValueKey).(types.User)
-	if !isOk {
-		return nil, errors.New("error at extracting user")
+	var userCookieValue string
+	userCookie, err := req.Cookie(hs.cfg.UserCookieName)
+	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			userCookieValue = ""
+		} else {
+			return
+		}
+	} else {
+		userCookieValue = userCookie.Value
 	}
+
+	cfgSecretKey, err := hs.cfg.GetSecretKey()
+	if err != nil {
+		return
+	}
+
+	if userCookieValue != "" {
+		usr, err = crypto.DecryptSignedUUID([]byte(userCookieValue), cfgSecretKey)
+		if err != nil {
+			usr = nil
+		}
+	}
+	if usr == nil {
+		usr, err = hs.shortener.GenerateNewUser()
+		if err != nil {
+			return
+		}
+	}
+
+	return
+}
+
+func (hs *handlers) setUserCookie(usr btypes.User, w http.ResponseWriter) (err error) {
+
+	cfgSecretKey, err := hs.cfg.GetSecretKey()
+	if err != nil {
+		return
+	}
+
+	userUUIDEncryptedAndSigned, err := crypto.EncryptAndSignUUID(usr, cfgSecretKey)
+	if err != nil {
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:  hs.cfg.UserCookieName,
+		Value: string(userUUIDEncryptedAndSigned),
+	})
+
 	return
 }
 

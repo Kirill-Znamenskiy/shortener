@@ -1,33 +1,31 @@
 package blogic
 
 import (
-	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"github.com/Kirill-Znamenskiy/Shortener/pkg/kztests"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"net/url"
 	"testing"
 )
 
 func makeDefaultStorage(t *testing.T) (stg storage.Storage) {
-	stg = storage.NewInMemoryStorage()
+	stg, err := storage.NewInMemoryStorage()
+	require.NoError(t, err)
 
 	newUUID := uuid.New()
-	user := types.User(&newUUID)
+	user := btypes.User(&newUUID)
 
 	u, err := url.Parse("https://Kirill.Znamenskiy.pw")
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = stg.PutRecord(&types.Record{
+	require.NoError(t, err)
+	err = stg.PutRecord(&btypes.Record{
 		Key:         "shortid",
 		OriginalURL: u,
 		User:        user,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	return
 }
@@ -36,14 +34,14 @@ func TestSaveNewURL(t *testing.T) {
 	stg := makeDefaultStorage(t)
 	sh := Shortener{stg: stg}
 	functions := sh.SaveNewURL
-	checkEmptyRecordKeyFunc := func(t *testing.T, rec *types.Record) bool {
+	checkEmptyRecordKeyFunc := func(t *testing.T, rec *btypes.Record) bool {
 		return rec == nil || rec.Key == ""
 	}
-	checkNonEmptyRecordKeyFunc := func(t *testing.T, rec *types.Record) bool {
+	checkNonEmptyRecordKeyFunc := func(t *testing.T, rec *btypes.Record) bool {
 		return rec.Key != ""
 	}
 	newUUID := uuid.New()
-	user := types.User(&newUUID)
+	user := btypes.User(&newUUID)
 	testKits := []kztests.TestKit{
 		{Arg1: user, Arg2: "https://Kirill.Znamenskiy.pw", Result1: checkNonEmptyRecordKeyFunc, Result2: assert.NoError},
 		{Arg1: user, Arg2: "", Result1: checkNonEmptyRecordKeyFunc, Result2: assert.NoError},

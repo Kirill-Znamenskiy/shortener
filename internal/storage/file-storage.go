@@ -4,9 +4,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"io"
-	"log"
 	"os"
 )
 
@@ -15,13 +14,13 @@ type FileStorage struct {
 	filePath string
 }
 
-func NewFileStorage(filePath string) (ret *FileStorage) {
+func NewFileStorage(filePath string) (ret *FileStorage, err error) {
 	ret = &FileStorage{
 		filePath: filePath,
 	}
-	err := ret.LoadDataFromFile()
+	err = ret.LoadDataFromFile()
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	return
 }
@@ -34,7 +33,7 @@ func (s *FileStorage) PutSecretKey(secretKey []byte) (err error) {
 	err = s.SaveDataToFile()
 	return
 }
-func (s *FileStorage) PutRecord(r *types.Record) (err error) {
+func (s *FileStorage) PutRecord(r *btypes.Record) (err error) {
 	err = s.InMemoryStorage.PutRecord(r)
 	if err != nil {
 		return
@@ -44,7 +43,10 @@ func (s *FileStorage) PutRecord(r *types.Record) (err error) {
 }
 
 func (s *FileStorage) LoadDataFromFile() (err error) {
-	s.InMemoryStorage = NewInMemoryStorage()
+	s.InMemoryStorage, err = NewInMemoryStorage()
+	if err != nil {
+		return
+	}
 
 	file, err := os.Open(s.filePath)
 	if errors.Is(err, os.ErrNotExist) {

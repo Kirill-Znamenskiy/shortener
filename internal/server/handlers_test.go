@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
 	"github.com/google/uuid"
@@ -55,7 +55,7 @@ func TestRootHandler(t *testing.T) {
 	}
 
 	newUUID := uuid.New()
-	user := types.User(&newUUID)
+	user := btypes.User(&newUUID)
 
 	userEncryptedAndSigned, err := crypto.EncryptAndSignUUID(user, cfgSecretKey)
 	if err != nil {
@@ -72,6 +72,16 @@ func TestRootHandler(t *testing.T) {
 		req  request
 		resp response
 	}{
+		{
+			key: "ping",
+			req: request{
+				method: http.MethodGet,
+				target: "/ping",
+			},
+			resp: response{
+				code: http.StatusOK,
+			},
+		},
 		{
 			key: "positive",
 			req: request{
@@ -220,7 +230,7 @@ func TestRootHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cfg.GetStorage().PutRecord(&types.Record{
+	err = cfg.GetStorage().PutRecord(&btypes.Record{
 		Key:         "positive-test-2",
 		OriginalURL: u,
 		User:        user,

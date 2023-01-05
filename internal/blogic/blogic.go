@@ -1,7 +1,7 @@
 package blogic
 
 import (
-	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"github.com/google/uuid"
 	"github.com/teris-io/shortid"
@@ -23,13 +23,13 @@ func NewShortener(baseURL string, stg storage.Storage) *Shortener {
 }
 
 // BuildShortURL make record short url, by record key.
-func (sh *Shortener) BuildShortURL(record *types.Record) (recordShortURL string) {
+func (sh *Shortener) BuildShortURL(record *btypes.Record) (recordShortURL string) {
 	return sh.baseURL + "/" + record.Key
 }
 
 // SaveNewURL save new url in storage.
-func (sh *Shortener) SaveNewURL(user *uuid.UUID, urlStr string) (ret *types.Record, err error) {
-	record := new(types.Record)
+func (sh *Shortener) SaveNewURL(user *uuid.UUID, urlStr string) (ret *btypes.Record, err error) {
+	record := new(btypes.Record)
 	record.User = user
 
 	record.OriginalURL, err = url.Parse(urlStr)
@@ -53,14 +53,14 @@ func (sh *Shortener) SaveNewURL(user *uuid.UUID, urlStr string) (ret *types.Reco
 
 // GetSavedURL extract early saved url from storage by key.
 func (sh *Shortener) GetSavedURL(recordKey string) (u *url.URL, isOk bool) {
-	record := sh.stg.GetRecord(recordKey)
+	record, _ := sh.stg.GetRecord(recordKey)
 	if record == nil {
 		return
 	}
 	return record.OriginalURL, true
 }
 
-func (sh *Shortener) GetAllUserRecords(user types.User) (ret map[string]*types.Record) {
+func (sh *Shortener) GetAllUserRecords(user btypes.User) (ret map[string]*btypes.Record, err error) {
 	return sh.stg.GetAllUserRecords(user)
 }
 
@@ -72,7 +72,7 @@ func (sh *Shortener) GenerateNewRecordKey() (ret string, err error) {
 		if err != nil {
 			return
 		}
-		if r := sh.stg.GetRecord(ret); r == nil {
+		if r, _ := sh.stg.GetRecord(ret); r == nil {
 			break
 		}
 	}
@@ -81,7 +81,7 @@ func (sh *Shortener) GenerateNewRecordKey() (ret string, err error) {
 }
 
 // GenerateNewUser generate new user UUID, that don't exist in storage.
-func (sh *Shortener) GenerateNewUser() (ret types.User, err error) {
+func (sh *Shortener) GenerateNewUser() (ret btypes.User, err error) {
 
 	var tmp uuid.UUID
 
@@ -91,7 +91,7 @@ func (sh *Shortener) GenerateNewUser() (ret types.User, err error) {
 			return
 		}
 		ret = &tmp
-		if m := sh.stg.GetAllUserRecords(ret); len(m) == 0 {
+		if m, _ := sh.stg.GetAllUserRecords(ret); len(m) == 0 {
 			break
 		}
 	}
