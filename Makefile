@@ -4,9 +4,9 @@ build-bins:
 	go build -o ./aux/bins/ ./cmd/*
 
 
-ttt: build-bins t12
+ttt: build-bins t13
 
-ttt-all: build-bins t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
+ttt-all: build-bins t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12 t13
 
 tt1: build-bins t1
 tt2: tt1 t2
