@@ -1,13 +1,12 @@
 package blogic
 
 import (
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"github.com/google/uuid"
 	"github.com/teris-io/shortid"
 	"net/url"
 )
-
-type User *uuid.UUID
 
 // Shortener is main shortener struct.
 type Shortener struct {
@@ -23,60 +22,66 @@ func NewShortener(baseURL string, stg storage.Storage) *Shortener {
 	}
 }
 
-// MakeShortURL make record short url, by record key.
-func (sh *Shortener) MakeShortURL(recordKey string) (recordShortURL string) {
-	return sh.baseURL + "/" + recordKey
+// BuildShortURL make record short url, by record key.
+func (sh *Shortener) BuildShortURL(record *types.Record) (recordShortURL string) {
+	return sh.baseURL + "/" + record.Key
 }
 
 // SaveNewURL save new url in storage.
-func (sh *Shortener) SaveNewURL(userUUID *uuid.UUID, urlStr string) (shortURL string, err error) {
-	urlObj, err := url.Parse(urlStr)
+func (sh *Shortener) SaveNewURL(user *uuid.UUID, urlStr string) (ret *types.Record, err error) {
+	record := new(types.Record)
+	record.User = user
+
+	record.OriginalURL, err = url.Parse(urlStr)
 	if err != nil {
 		return
 	}
 
-	recordKey, err := sh.GenerateNewRecordKey(userUUID)
+	record.Key, err = sh.GenerateNewRecordKey()
 	if err != nil {
 		return
 	}
 
-	err = sh.stg.Put(userUUID, recordKey, urlObj)
+	err = sh.stg.PutRecord(record)
 	if err != nil {
 		return
 	}
 
-	return sh.MakeShortURL(recordKey), nil
+	ret = record
+	return
 }
 
 // GetSavedURL extract early saved url from storage by key.
-func (sh *Shortener) GetSavedURL(userUUID *uuid.UUID, recordKey string) (u *url.URL, isOk bool) {
-	return sh.stg.Get(userUUID, recordKey)
+func (sh *Shortener) GetSavedURL(recordKey string) (u *url.URL, isOk bool) {
+	record := sh.stg.GetRecord(recordKey)
+	if record == nil {
+		return
+	}
+	return record.OriginalURL, true
 }
 
-func (sh *Shortener) GetAllUserURLs(userUUID *uuid.UUID) (userRecordKey2URL map[string]*url.URL) {
-	userRecordKey2URL, _ = sh.stg.GetAllUserURLs(userUUID)
-	return userRecordKey2URL
+func (sh *Shortener) GetAllUserRecords(user types.User) (ret map[string]*types.Record) {
+	return sh.stg.GetAllUserRecords(user)
 }
 
 // GenerateNewRecordKey generate new record key, that don't exist in storage.
-func (sh *Shortener) GenerateNewRecordKey(userUUID *uuid.UUID) (ret string, err error) {
+func (sh *Shortener) GenerateNewRecordKey() (ret string, err error) {
 
 	for {
 		ret, err = shortid.Generate()
 		if err != nil {
 			return
 		}
-		if _, isOk := sh.stg.Get(userUUID, ret); isOk {
-			continue
+		if r := sh.stg.GetRecord(ret); r == nil {
+			break
 		}
-		break
 	}
 
 	return
 }
 
-// GenerateNewUserUUID generate new user UUID, that don't exist in storage.
-func (sh *Shortener) GenerateNewUserUUID() (ret *uuid.UUID, err error) {
+// GenerateNewUser generate new user UUID, that don't exist in storage.
+func (sh *Shortener) GenerateNewUser() (ret types.User, err error) {
 
 	var tmp uuid.UUID
 
@@ -86,10 +91,9 @@ func (sh *Shortener) GenerateNewUserUUID() (ret *uuid.UUID, err error) {
 			return
 		}
 		ret = &tmp
-		if _, isOk := sh.stg.GetAllUserURLs(ret); isOk {
-			continue
+		if m := sh.stg.GetAllUserRecords(ret); len(m) == 0 {
+			break
 		}
-		break
 	}
 
 	return

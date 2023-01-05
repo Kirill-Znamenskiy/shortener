@@ -6,10 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"path"
@@ -96,7 +96,7 @@ func CleanURLPathMiddleware() func(next http.Handler) http.Handler {
 	}
 }
 
-func AuthUserMiddleware(cfg *config.Config, generateNewUserUUIDFunc func() (*uuid.UUID, error)) func(next http.Handler) http.Handler {
+func AuthUserMiddleware(cfg *config.Config, generateNewUserUUIDFunc func() (types.User, error)) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -118,34 +118,39 @@ func AuthUserMiddleware(cfg *config.Config, generateNewUserUUIDFunc func() (*uui
 				return
 			}
 
-			var userUUID *uuid.UUID
+			var usr types.User
 			if userCookieValue != "" {
-				userUUID, err = crypto.DecryptSignedUsedUUID([]byte(userCookieValue), cfgSecretKey)
+				usr, err = crypto.DecryptSignedUUID([]byte(userCookieValue), cfgSecretKey)
 				if err != nil {
-					userUUID = nil
+					usr = nil
 				}
 			}
-			if userUUID == nil {
-				userUUID, err = generateNewUserUUIDFunc()
+			if usr == nil {
+				usr, err = generateNewUserUUIDFunc()
 				if checkErrorAsInternalServerError(w, err) {
 					return
 				}
 			}
 
-			r = r.WithContext(context.WithValue(r.Context(), myString("ptrToUserUUID"), userUUID))
+			r = r.WithContext(context.WithValue(r.Context(), userContextValueKey, usr))
 
-			next.ServeHTTP(w, r)
+			crw := NewCustomResponseWriter()
+			next.ServeHTTP(crw, r)
 
-			userUUIDEncryptedAndSigned, err := crypto.EncryptAndSignUserUUID(userUUID, cfgSecretKey)
+			userUUIDEncryptedAndSigned, err := crypto.EncryptAndSignUUID(usr, cfgSecretKey)
 			if checkErrorAsInternalServerError(w, err) {
 				return
 			}
 
-			http.SetCookie(w, &http.Cookie{
+			http.SetCookie(crw, &http.Cookie{
 				Name:  cfg.UserCookieName,
 				Value: string(userUUIDEncryptedAndSigned),
 			})
 
+			_, err = crw.WriteToNext(w)
+			if checkErrorAsInternalServerError(w, err) {
+				return
+			}
 		})
 	}
 }

@@ -2,62 +2,57 @@ package storage
 
 import (
 	"fmt"
-	"github.com/google/uuid"
-	"net/url"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 )
 
 type InMemoryStorage struct {
-	secretKey              []byte
-	userUUID2RecordKey2URL map[uuid.UUID]map[string]*url.URL
+	SecretKey  []byte
+	Key2Record map[string]*types.Record
 }
 
 func NewInMemoryStorage() *InMemoryStorage {
 	return &InMemoryStorage{
-		userUUID2RecordKey2URL: make(map[uuid.UUID]map[string]*url.URL),
+		Key2Record: make(map[string]*types.Record),
 	}
 }
 
 func (s *InMemoryStorage) PutSecretKey(secretKey []byte) (err error) {
-	s.secretKey = secretKey
+	s.SecretKey = secretKey
 	return nil
 }
 
 func (s *InMemoryStorage) GetSecretKey() []byte {
-	return s.secretKey
+	return s.SecretKey
 }
 
-func (s *InMemoryStorage) Put(userUUID *uuid.UUID, recordKey string, urlParam *url.URL) (err error) {
-	recordKey2URL, isOk := s.userUUID2RecordKey2URL[*userUUID]
-	if isOk {
-		if _, isOk := recordKey2URL[recordKey]; isOk {
-			return fmt.Errorf("recordKey %q already exists", recordKey)
-		}
-	} else {
-		s.userUUID2RecordKey2URL[*userUUID] = make(map[string]*url.URL)
+func (s *InMemoryStorage) PutRecord(r *types.Record) (err error) {
+	if _, isAlreadyExists := s.Key2Record[r.Key]; isAlreadyExists {
+		return fmt.Errorf("record with key %q already exists", r.Key)
 	}
 
-	s.userUUID2RecordKey2URL[*userUUID][recordKey] = urlParam
+	s.Key2Record[r.Key] = r
 	return
 }
 
-func (s *InMemoryStorage) Get(userUUID *uuid.UUID, recordKey string) (url *url.URL, isOk bool) {
-	recordKey2URL, isOk := s.GetAllUserURLs(userUUID)
+func (s *InMemoryStorage) GetRecord(key string) (r *types.Record) {
+	r, isOk := s.Key2Record[key]
 	if !isOk {
-		return nil, false
+		return nil
 	}
 
-	url, isOk = recordKey2URL[recordKey]
 	return
 }
 
-func (s *InMemoryStorage) GetAllUserURLs(userUUID *uuid.UUID) (userRecordKey2URL map[string]*url.URL, isOk bool) {
-	userRecordKey2URL, isOk = s.userUUID2RecordKey2URL[*userUUID]
+func (s *InMemoryStorage) GetAllUserRecords(user types.User) (userKey2Record map[string]*types.Record) {
+	userKey2Record = make(map[string]*types.Record)
+	for key, record := range s.Key2Record {
+		if *record.User == *user {
+			userKey2Record[key] = record
+		}
+	}
 	return
 }
 
-func (s *InMemoryStorage) setSrcMap(mp map[uuid.UUID]map[string]*url.URL) {
-	s.userUUID2RecordKey2URL = mp
-}
-func (s *InMemoryStorage) getSrcMap() map[uuid.UUID]map[string]*url.URL {
-	return s.userUUID2RecordKey2URL
+func (s *InMemoryStorage) IsEmpty() bool {
+	return len(s.SecretKey) == 0 && len(s.Key2Record) == 0
 }

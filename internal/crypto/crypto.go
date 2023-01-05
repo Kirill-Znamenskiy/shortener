@@ -87,18 +87,18 @@ func DecryptMessage(encryptedMsg []byte, secretKey []byte) (clearMsg []byte, err
 	return
 }
 
-func EncryptAndSignUserUUID(userUUID *uuid.UUID, secretKey []byte) (ret []byte, err error) {
-	//log.Printf("EncryptAndSignUserUUID(secretKey=%x)", secretKey)
+func EncryptAndSignUUID(target *uuid.UUID, secretKey []byte) (ret []byte, err error) {
+	//log.Printf("EncryptAndSignUUID(secretKey=%x)", secretKey)
 
-	//log.Printf("userUUID: %x", userUUID)
+	//log.Printf("target: %x", target)
 
-	sign, err := MakeUserUUIDSign(userUUID, secretKey)
+	sign, err := MakeUserUUIDSign(target, secretKey)
 	if err != nil {
 		return
 	}
 
-	aux := make([]byte, 0, len(*userUUID)+len(sign))
-	aux = append(aux, (*userUUID)[:]...)
+	aux := make([]byte, 0, len(*target)+len(sign))
+	aux = append(aux, (*target)[:]...)
 	aux = append(aux, sign...)
 
 	//log.Printf("userUUIDSign: %x", aux)
@@ -116,8 +116,8 @@ func EncryptAndSignUserUUID(userUUID *uuid.UUID, secretKey []byte) (ret []byte, 
 	return
 }
 
-func DecryptSignedUsedUUID(msg []byte, secretKey []byte) (ret *uuid.UUID, err error) {
-	//log.Printf("DecryptSignedUsedUUID(secretKey=%x)", secretKey)
+func DecryptSignedUUID(msg []byte, secretKey []byte) (ret *uuid.UUID, err error) {
+	//log.Printf("DecryptSignedUUID(secretKey=%x)", secretKey)
 
 	// 16 for uuid + 32 for sha256 sign
 	validSize := 16 + 32

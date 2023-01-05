@@ -4,10 +4,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"github.com/google/uuid"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 	"io"
 	"log"
-	"net/url"
 	"os"
 )
 
@@ -35,18 +34,13 @@ func (s *FileStorage) PutSecretKey(secretKey []byte) (err error) {
 	err = s.SaveDataToFile()
 	return
 }
-func (s *FileStorage) Put(userUUID *uuid.UUID, recordKey string, url *url.URL) (err error) {
-	err = s.InMemoryStorage.Put(userUUID, recordKey, url)
+func (s *FileStorage) PutRecord(r *types.Record) (err error) {
+	err = s.InMemoryStorage.PutRecord(r)
 	if err != nil {
 		return
 	}
 	err = s.SaveDataToFile()
 	return
-}
-
-type inFileData struct {
-	SecretKey              []byte
-	UserUUID2RecordKey2URL map[uuid.UUID]map[string]*url.URL
 }
 
 func (s *FileStorage) LoadDataFromFile() (err error) {
@@ -68,16 +62,10 @@ func (s *FileStorage) LoadDataFromFile() (err error) {
 	}
 
 	if len(toLoadBytes) > 0 {
-		var toLoadData inFileData
-		err = json.Unmarshal(toLoadBytes, &toLoadData)
+		err = json.Unmarshal(toLoadBytes, s.InMemoryStorage)
 		if err != nil {
 			return
 		}
-		err = s.InMemoryStorage.PutSecretKey(toLoadData.SecretKey)
-		if err != nil {
-			return
-		}
-		s.InMemoryStorage.setSrcMap(toLoadData.UserUUID2RecordKey2URL)
 	}
 
 	return
@@ -91,14 +79,11 @@ func (s *FileStorage) SaveDataToFile() (err error) {
 	}
 	defer file.Close()
 
-	toSaveData := new(inFileData)
-	toSaveData.SecretKey = s.InMemoryStorage.GetSecretKey()
-	toSaveData.UserUUID2RecordKey2URL = s.InMemoryStorage.getSrcMap()
-	if len(toSaveData.SecretKey) == 0 && len(toSaveData.UserUUID2RecordKey2URL) == 0 {
+	if s.InMemoryStorage.IsEmpty() {
 		return
 	}
 
-	toSaveBytes, err := json.Marshal(toSaveData)
+	toSaveBytes, err := json.Marshal(s.InMemoryStorage)
 	if err != nil {
 		return
 	}

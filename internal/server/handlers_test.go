@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
 	"github.com/google/uuid"
@@ -53,17 +54,17 @@ func TestRootHandler(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	tmp := uuid.New()
-	userUUID := &tmp
+	newUUID := uuid.New()
+	user := types.User(&newUUID)
 
-	userUUIDEncryptedAndSigned, err := crypto.EncryptAndSignUserUUID(userUUID, cfgSecretKey)
+	userEncryptedAndSigned, err := crypto.EncryptAndSignUUID(user, cfgSecretKey)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	userUUIDCookie := http.Cookie{
+	userCookie := http.Cookie{
 		Name:  cfg.UserCookieName,
-		Value: string(userUUIDEncryptedAndSigned),
+		Value: string(userEncryptedAndSigned),
 	}
 
 	tkits := []struct {
@@ -119,7 +120,7 @@ func TestRootHandler(t *testing.T) {
 			req: request{
 				method: http.MethodPost,
 				target: "/api/shorten",
-				body:   `{"URL": "https://Kirill.Znamenskiy.pw"}`,
+				body:   `{"OriginalURL": "https://Kirill.Znamenskiy.pw"}`,
 			},
 			resp: response{
 				code: http.StatusBadRequest,
@@ -130,7 +131,7 @@ func TestRootHandler(t *testing.T) {
 			req: request{
 				method:  http.MethodPost,
 				target:  "/api/shorten",
-				body:    `{"URL": "https://Kirill.Znamenskiy.pw"}`,
+				body:    `{"OriginalURL": "https://Kirill.Znamenskiy.pw"}`,
 				headers: map[string]string{"Content-Type": "application/json;charset=UTF-8"},
 			},
 			resp: response{
@@ -144,7 +145,7 @@ func TestRootHandler(t *testing.T) {
 			req: request{
 				method:  http.MethodGet,
 				target:  "/positive-test-2",
-				headers: map[string]string{"Cookie": userUUIDCookie.String()},
+				headers: map[string]string{"Cookie": userCookie.String()},
 			},
 			resp: response{
 				code:      http.StatusTemporaryRedirect,
@@ -207,7 +208,7 @@ func TestRootHandler(t *testing.T) {
 			req: request{
 				method:  http.MethodGet,
 				target:  "/api/user/urls",
-				headers: map[string]string{"Cookie": userUUIDCookie.String()},
+				headers: map[string]string{"Cookie": userCookie.String()},
 			},
 			resp: response{
 				code: http.StatusOK,
@@ -219,7 +220,11 @@ func TestRootHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = cfg.GetStorage().Put(userUUID, "positive-test-2", u)
+	err = cfg.GetStorage().PutRecord(&types.Record{
+		Key:         "positive-test-2",
+		OriginalURL: u,
+		User:        user,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

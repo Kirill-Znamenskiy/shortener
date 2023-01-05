@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
 	"io"
 	"log"
 	"mime"
@@ -39,7 +39,7 @@ func MakeMainHandler(cfg *config.Config) http.Handler {
 
 	r.Use(middleware.AllowContentType("", TextHTML, TextPlain, ApplicationJSON))
 
-	r.Use(AuthUserMiddleware(cfg, shortener.GenerateNewUserUUID))
+	r.Use(AuthUserMiddleware(cfg, shortener.GenerateNewUser))
 
 	r.Post("/", hs.makeWrapperForJSONHandlerFunc(hs.makeSaveNewURLHandlerFunc()))
 	r.Get("/{key:[-\\w]+}", hs.makeGetURLHandlerFunc())
@@ -81,7 +81,7 @@ func (hs *handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) 
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			reqBodyCont = []byte(`{"URL":"` + string(reqBodyCont) + `"}`)
+			reqBodyCont = []byte(`{"url":"` + string(reqBodyCont) + `"}`)
 			req.Body = io.NopCloser(bytes.NewReader(reqBodyCont))
 
 			req.Header.Set("Content-Type", ApplicationJSON)
@@ -144,12 +144,12 @@ func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			return
 		}
 
-		userUUID, err := extractUserUUID(req)
+		userUUID, err := extractUser(req)
 		if checkErrorAsInternalServerError(w, err) {
 			return
 		}
 
-		shortURL, err := hs.shortener.SaveNewURL(userUUID, reqData.URL)
+		record, err := hs.shortener.SaveNewURL(userUUID, reqData.URL)
 		if checkErrorAsInternalServerError(w, err) {
 			return
 		}
@@ -157,7 +157,7 @@ func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 		respData := new(struct {
 			Result string `json:"result"`
 		})
-		respData.Result = shortURL
+		respData.Result = hs.shortener.BuildShortURL(record)
 
 		finishHandler(w, respData, http.StatusCreated)
 	}
@@ -166,12 +166,8 @@ func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 func (hs *handlers) makeGetURLHandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		key := chi.URLParam(req, "key")
-		userUUID, err := extractUserUUID(req)
-		if checkErrorAsInternalServerError(w, err) {
-			return
-		}
 
-		if url, isOk := hs.shortener.GetSavedURL(userUUID, key); isOk {
+		if url, isOk := hs.shortener.GetSavedURL(key); isOk {
 			w.Header().Add("Location", url.String())
 			w.WriteHeader(http.StatusTemporaryRedirect)
 		} else {
@@ -182,23 +178,23 @@ func (hs *handlers) makeGetURLHandlerFunc() http.HandlerFunc {
 
 func (hs *handlers) makeGetUserURLsHandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		userUUID, err := extractUserUUID(req)
+		user, err := extractUser(req)
 		if checkErrorAsInternalServerError(w, err) {
 			return
 		}
+		allUserRecords := hs.shortener.GetAllUserRecords(user)
 
-		userRecordKey2URL := hs.shortener.GetAllUserURLs(userUUID)
-		if len(userRecordKey2URL) == 0 {
+		if len(allUserRecords) == 0 {
 			w.WriteHeader(http.StatusNoContent)
 		} else {
 			respData := make([]struct {
 				ShortURL    string `json:"short_url"`
 				OriginalURL string `json:"original_url"`
-			}, len(userRecordKey2URL))
+			}, len(allUserRecords))
 			ind := 0
-			for recordKey, recordOriginalURL := range userRecordKey2URL {
-				respData[ind].ShortURL = hs.shortener.MakeShortURL(recordKey)
-				respData[ind].OriginalURL = recordOriginalURL.String()
+			for _, record := range allUserRecords {
+				respData[ind].ShortURL = hs.shortener.BuildShortURL(record)
+				respData[ind].OriginalURL = record.OriginalURL.String()
 			}
 
 			finishHandler(w, respData, http.StatusOK)
@@ -225,10 +221,12 @@ func checkError(w http.ResponseWriter, err error, respHTTPCode int) bool {
 
 type myString string
 
-func extractUserUUID(req *http.Request) (ret *uuid.UUID, err error) {
-	ret, isOk := req.Context().Value(myString("ptrToUserUUID")).(*uuid.UUID)
+const userContextValueKey myString = "user"
+
+func extractUser(req *http.Request) (ret types.User, err error) {
+	ret, isOk := req.Context().Value(userContextValueKey).(types.User)
 	if !isOk {
-		return nil, errors.New("error at extracting user UUID")
+		return nil, errors.New("error at extracting user")
 	}
 	return
 }
