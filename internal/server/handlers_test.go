@@ -8,7 +8,9 @@ import (
 	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 	"io"
 	"log"
 	"net/http"
@@ -50,9 +52,7 @@ func TestRootHandler(t *testing.T) {
 	config.LoadFromEnv(context.TODO(), cfg)
 
 	cfgSecretKey, err := cfg.GetSecretKey()
-	if err != nil {
-		log.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	newUUID := uuid.New()
 	user := btypes.User(&newUUID)
@@ -226,18 +226,20 @@ func TestRootHandler(t *testing.T) {
 			},
 		},
 	}
-	u, err := url.Parse("https://Kirill.Znamenskiy.pw")
-	if err != nil {
-		t.Fatal(err)
+	switch stg := cfg.GetStorage().(type) {
+	case *storage.DBStorage:
+		err = stg.TruncateAllRecords()
+		require.NoError(t, err)
+	default:
 	}
+	u, err := url.Parse("https://Kirill.Znamenskiy.pw")
+	require.NoError(t, err)
 	err = cfg.GetStorage().PutRecord(&btypes.Record{
 		Key:         "positive-test-2",
 		OriginalURL: u,
 		User:        user,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for tind, tkit := range tkits {
 		t.Run(fmt.Sprintf("Test %d %s", tind+1, tkit.key), func(t *testing.T) {
 			var tstReqBody io.Reader
