@@ -1,109 +1,76 @@
 package storage
 
 import (
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
+	"github.com/Kirill-Znamenskiy/Shortener/pkg/kztests"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"log"
 	"net/url"
 	"testing"
 )
 
-func makeDefaultStorage(t *testing.T) Storage {
-	stg := NewInMemoryStorage()
-	u, err := url.Parse("https://Kirill.Znamenskiy.pw")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = stg.Put("shortid", u)
-	if err != nil {
-		t.Fatal(err)
-	}
+func TestNewInMemoryStorage(t *testing.T) {
+	t.Run("Test 1", func(t *testing.T) {
+		res, err := NewInMemoryStorage()
+		assert.NoError(t, err)
+		assert.True(t, res.IsEmpty())
+	})
+}
 
-	return stg
+func makeDefaultStorage(t *testing.T) (stg Storage) {
+	stg, err := NewInMemoryStorage()
+	require.NoError(t, err)
+
+	newUUID := uuid.New()
+	user := btypes.User(&newUUID)
+
+	u, err := url.Parse("https://Kirill.Znamenskiy.pw")
+	require.NoError(t, err)
+	err = stg.PutRecord(&btypes.Record{
+		Key:         "shortid",
+		OriginalURL: u,
+		User:        user,
+	})
+	require.NoError(t, err)
+
+	return
 }
 
 func TestInMemoryStorage_Get(t *testing.T) {
-	tests := []struct {
-		name     string
-		argKey   string
-		wantURL  string
-		wantIsOk bool
-	}{
-		{
-			name:     "test#1",
-			argKey:   "shortid",
-			wantIsOk: true,
-			wantURL:  "https://Kirill.Znamenskiy.pw",
-		},
-		{
-			name:     "test#2",
-			argKey:   "aaaa",
-			wantIsOk: false,
-			wantURL:  "",
-		},
-		{
-			name:     "test#3",
-			argKey:   "",
-			wantIsOk: false,
-			wantURL:  "",
-		},
-	}
 	stg := makeDefaultStorage(t)
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gotURL, gotIsOk := stg.Get(tt.argKey)
-			assert.Equal(t, tt.wantIsOk, gotIsOk)
-			gotURLString := ""
-			if gotURL != nil {
-				gotURLString = gotURL.String()
-			}
-			assert.Equal(t, tt.wantURL, gotURLString)
-		})
+	functions := stg.GetRecord
+	makeCheckResult1Func := func(expectedURL string) any {
+		return func(t *testing.T, rec *btypes.Record) bool {
+			return rec.OriginalURL.String() == expectedURL
+		}
 	}
+	testKits := []kztests.TestKit{
+		{Arg: "shortid", Result1: makeCheckResult1Func("https://Kirill.Znamenskiy.pw"), Result2: assert.NoError},
+		{Arg: "aaa", Result1: assert.Nil, Result2: assert.NoError},
+		{Arg: "", Result1: assert.Nil, Result2: assert.NoError},
+	}
+	kztests.RunTests(t, functions, testKits)
 }
 
 func TestInMemoryStorage_Put(t *testing.T) {
-	tests := []struct {
-		name   string
-		argKey string
-		argURL string
-		want   string
-	}{
-		{
-			name:   "test#1",
-			argKey: "aaa",
-			argURL: "abfasb",
-			want:   "aaa",
-		},
-		{
-			name:   "test#2",
-			argKey: "bbb",
-			argURL: "http://abfasb.org",
-			want:   "bbb",
-		},
-		{
-			name:   "test#2",
-			argKey: "ccc",
-			argURL: "",
-			want:   "ccc",
-		},
-	}
 	stg := makeDefaultStorage(t)
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			u, err := url.Parse(tt.argURL)
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			got, err := stg.Put(tt.argKey, u)
-			assert.NoError(t, err)
-			assert.Equal(t, tt.want, got)
-		})
+	functions := stg.PutRecord
+	parseURLFunc := func(urlStr string) *url.URL {
+		ret, err := url.Parse(urlStr)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return ret
 	}
-}
-
-func TestNewInMemoryStorage(t *testing.T) {
-	t.Run("test#1", func(t *testing.T) {
-		got := NewInMemoryStorage()
-		assert.Empty(t, got.key2url)
-	})
+	newUUID := uuid.New()
+	user := btypes.User(&newUUID)
+	testKits := []kztests.TestKit{
+		{Arg: &btypes.Record{Key: "aaa", OriginalURL: parseURLFunc("asdfas"), User: user}, Result: assert.NoError},
+		{Arg: &btypes.Record{Key: "bbb", OriginalURL: parseURLFunc("http://abfasb.org"), User: user}, Result: assert.NoError},
+		{Arg: &btypes.Record{Key: "ccc", OriginalURL: parseURLFunc(""), User: user}, Result: assert.NoError},
+		{Arg: &btypes.Record{Key: "ccc", OriginalURL: parseURLFunc("xxx"), User: user}, Result: assert.Error},
+	}
+	kztests.RunTests(t, functions, testKits)
 }

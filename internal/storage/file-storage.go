@@ -4,9 +4,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/btypes"
 	"io"
-	"log"
-	"net/url"
 	"os"
 )
 
@@ -15,19 +14,27 @@ type FileStorage struct {
 	filePath string
 }
 
-func NewFileStorage(filePath string) (ret *FileStorage) {
+func NewFileStorage(filePath string) (ret *FileStorage, err error) {
 	ret = &FileStorage{
 		filePath: filePath,
 	}
-	err := ret.LoadDataFromFile()
+	err = ret.LoadDataFromFile()
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 	return
 }
 
-func (s *FileStorage) Put(key string, url *url.URL) (retKey string, err error) {
-	retKey, err = s.InMemoryStorage.Put(key, url)
+func (s *FileStorage) PutSecretKey(secretKey []byte) (err error) {
+	err = s.InMemoryStorage.PutSecretKey(secretKey)
+	if err != nil {
+		return
+	}
+	err = s.SaveDataToFile()
+	return
+}
+func (s *FileStorage) PutRecords(r []*btypes.Record) (err error) {
+	err = s.InMemoryStorage.PutRecords(r)
 	if err != nil {
 		return
 	}
@@ -36,7 +43,10 @@ func (s *FileStorage) Put(key string, url *url.URL) (retKey string, err error) {
 }
 
 func (s *FileStorage) LoadDataFromFile() (err error) {
-	s.InMemoryStorage = NewInMemoryStorage()
+	s.InMemoryStorage, err = NewInMemoryStorage()
+	if err != nil {
+		return
+	}
 
 	file, err := os.Open(s.filePath)
 	if errors.Is(err, os.ErrNotExist) {
@@ -54,7 +64,7 @@ func (s *FileStorage) LoadDataFromFile() (err error) {
 	}
 
 	if len(toLoadBytes) > 0 {
-		err = json.Unmarshal(toLoadBytes, &s.InMemoryStorage.key2url)
+		err = json.Unmarshal(toLoadBytes, s.InMemoryStorage)
 		if err != nil {
 			return
 		}
@@ -64,10 +74,6 @@ func (s *FileStorage) LoadDataFromFile() (err error) {
 }
 
 func (s *FileStorage) SaveDataToFile() (err error) {
-	toSaveData := s.InMemoryStorage.key2url
-	if len(toSaveData) == 0 {
-		return
-	}
 
 	file, err := os.OpenFile(s.filePath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
@@ -75,7 +81,11 @@ func (s *FileStorage) SaveDataToFile() (err error) {
 	}
 	defer file.Close()
 
-	toSaveBytes, err := json.Marshal(&toSaveData)
+	if s.InMemoryStorage.IsEmpty() {
+		return
+	}
+
+	toSaveBytes, err := json.Marshal(s.InMemoryStorage)
 	if err != nil {
 		return
 	}
