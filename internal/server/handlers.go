@@ -95,7 +95,7 @@ func (hs *handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) 
 			crw := NewCustomResponseWriter()
 			nextJSONHandler.ServeHTTP(crw, req)
 
-			if crw.StatusCode == http.StatusCreated {
+			if crw.StatusCode == http.StatusCreated || crw.StatusCode == http.StatusConflict {
 				respData := new(struct {
 					Result string `json:"result"`
 				})
