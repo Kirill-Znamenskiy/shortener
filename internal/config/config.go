@@ -30,19 +30,26 @@ func (cfg *Config) SetStorage(stg storage.Storage) {
 }
 func (cfg *Config) GetStorage() storage.Storage {
 	if cfg.stg == nil {
+		var err error
 		if cfg.DatabaseDsn != "" {
-			cfg.stg = storage.NewDBStorage(context.TODO(), cfg.DatabaseDsn)
+			cfg.stg, err = storage.NewDBStorage(cfg.DatabaseDsn)
 		} else if cfg.StorageFilePath != "" {
-			cfg.stg = storage.NewFileStorage(cfg.StorageFilePath)
+			cfg.stg, err = storage.NewFileStorage(cfg.StorageFilePath)
 		} else {
-			cfg.stg = storage.NewInMemoryStorage()
+			cfg.stg, err = storage.NewInMemoryStorage()
+		}
+		if err != nil {
+			log.Fatalln(err)
 		}
 	}
 	return cfg.stg
 }
 
 func (cfg *Config) GetSecretKey() (ret []byte, err error) {
-	storageSecretKey := cfg.GetStorage().GetSecretKey()
+	storageSecretKey, err := cfg.GetStorage().GetSecretKey()
+	if err != nil {
+		return nil, err
+	}
 	if len(storageSecretKey) == 0 {
 		if cfg.SecretKey == "" {
 			ret, err = crypto.GenerateSecretKey(32)

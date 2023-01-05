@@ -1,15 +1,12 @@
 SHELL:=/bin/bash
 
-
-
 build-bins:
-	go build \
-	    -o ./aux/bins/ \
-        ./cmd/*
+	go build -o ./aux/bins/ ./cmd/*
 
-one-ttt: build-bins t10
 
-ttt: build-bins t1 t2 t3 t4 t5 t6 t7 t8 t9 t10
+ttt: build-bins t11
+
+ttt-all: build-bins t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11
 
 tt1: build-bins t1
 tt2: tt1 t2
