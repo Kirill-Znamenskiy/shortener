@@ -7,8 +7,9 @@ build-bins:
 	    -o ./aux/bins/ \
         ./cmd/*
 
+one-ttt: build-bins t10
 
-ttt: build-bins t1 t2 t3 t4 t5 t6 t7 t8 t9
+ttt: build-bins t1 t2 t3 t4 t5 t6 t7 t8 t9 t10
 
 tt1: build-bins t1
 tt2: tt1 t2
@@ -22,6 +23,7 @@ tt9: tt8 t9
 tt10: tt9 t10
 tt11: tt10 t11
 tt12: tt11 t12
+tt13: tt12 t13
 
 
 
@@ -62,12 +64,16 @@ t8:
 	$T -test.run=^TestIteration8$$
 t9:
 	$T -test.run=^TestIteration9$$
+
+DD = postgres://yandex_practicum:${DB_PASSWORD}@${DB_HOST}:5432/yp_shortener?sslmode=disable
 t10:
-	$T -test.run=^TestIteration10$$ -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable'
+	$T -test.run=^TestIteration10$$ -database-dsn=${DD}
 t11:
-	$T -test.run=^TestIteration11$$ -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable'
+	$T -test.run=^TestIteration11$$ -database-dsn=${DD}
 t12:
-	$T -test.run=^TestIteration12$$ -database-dsn='postgres://postgres:postgres@postgres:5432/praktikum?sslmode=disable'
+	$T -test.run=^TestIteration12$$ -database-dsn=${DD}
+t13:
+	$T -test.run=^TestIteration13$$ -database-dsn=${DD}
 
 
 

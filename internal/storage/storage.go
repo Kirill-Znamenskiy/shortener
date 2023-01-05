@@ -10,4 +10,5 @@ type Storage interface {
 	PutRecord(r *types.Record) error
 	GetRecord(key string) (r *types.Record)
 	GetAllUserRecords(user types.User) (userKey2Record map[string]*types.Record)
+	Ping() error
 }

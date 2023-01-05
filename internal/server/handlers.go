@@ -47,6 +47,8 @@ func MakeMainHandler(cfg *config.Config) http.Handler {
 	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
 	r.Get("/api/user/urls", hs.makeGetUserURLsHandlerFunc())
 
+	r.Get("/ping", hs.makeGetPingHandlerFunc())
+
 	r.HandleFunc("/*", func(w http.ResponseWriter, req *http.Request) {
 		log.Printf("UNEXPECTED: %s %q\n", req.Method, req.URL.Path)
 		http.Error(w, "Bad Request", http.StatusBadRequest)
@@ -199,6 +201,16 @@ func (hs *handlers) makeGetUserURLsHandlerFunc() http.HandlerFunc {
 
 			finishHandler(w, respData, http.StatusOK)
 		}
+	}
+}
+
+func (hs *handlers) makeGetPingHandlerFunc() http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		err := hs.cfg.GetStorage().Ping()
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
+		w.WriteHeader(http.StatusOK)
 	}
 }
 

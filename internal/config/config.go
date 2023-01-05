@@ -21,6 +21,7 @@ type Config struct {
 	StorageFilePath string `env:"FILE_STORAGE_PATH" flag:"storage-file-path f" desc:"(env FILE_STORAGE_PATH) storage file path"`
 	UserCookieName  string `env:"USER_COOKIE_NAME,default=kkk" flag:"user-cookie-name" desc:"(env USER_COOKIE_NAME) user cookie name"`
 	SecretKey       string `env:"SECRET_KEY" flag:"secret-key" desc:"(env SECRET_KEY) server secret key"`
+	DatabaseDsn     string `env:"DATABASE_DSN" flag:"database-dsn d" desc:"(env DATABASE_DSN) database dsn"`
 	stg             storage.Storage
 }
 
@@ -29,10 +30,12 @@ func (cfg *Config) SetStorage(stg storage.Storage) {
 }
 func (cfg *Config) GetStorage() storage.Storage {
 	if cfg.stg == nil {
-		if cfg.StorageFilePath == "" {
-			cfg.stg = storage.NewInMemoryStorage()
-		} else {
+		if cfg.DatabaseDsn != "" {
+			cfg.stg = storage.NewDBStorage(context.TODO(), cfg.DatabaseDsn)
+		} else if cfg.StorageFilePath != "" {
 			cfg.stg = storage.NewFileStorage(cfg.StorageFilePath)
+		} else {
+			cfg.stg = storage.NewInMemoryStorage()
 		}
 	}
 	return cfg.stg
