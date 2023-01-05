@@ -1,8 +1,13 @@
 package storage
 
-import "net/url"
+import (
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
+)
 
 type Storage interface {
-	Put(key string, url *url.URL) error
-	Get(key string) (url *url.URL, isOk bool)
+	PutSecretKey(secretKey []byte) error
+	GetSecretKey() []byte
+	PutRecord(r *types.Record) error
+	GetRecord(key string) (r *types.Record)
+	GetAllUserRecords(user types.User) (userKey2Record map[string]*types.Record)
 }

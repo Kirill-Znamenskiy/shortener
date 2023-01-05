@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/crypto"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"github.com/octago/sflags/gen/gpflag"
 	"github.com/sethvargo/go-envconfig"
@@ -15,9 +16,11 @@ import (
 )
 
 type Config struct {
-	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080" flagName:"server-address" flagShortName:"a" flagUsage:"server address"`
-	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080" flagName:"base-url" flagShortName:"b" flagUsage:"base url"`
-	StorageFilePath string `env:"FILE_STORAGE_PATH" flagName:"storage-file-path" flagShortName:"f" flagUsage:"storage file path"`
+	ServerAddress   string `env:"SERVER_ADDRESS,default=localhost:8080" flag:"server-address a" desc:"(env SERVER_ADDRESS) server address"`
+	BaseURL         string `env:"BASE_URL,default=http://localhost:8080" flag:"base-url b" desc:"(env BASE_URL) base url"`
+	StorageFilePath string `env:"FILE_STORAGE_PATH" flag:"storage-file-path f" desc:"(env FILE_STORAGE_PATH) storage file path"`
+	UserCookieName  string `env:"USER_COOKIE_NAME,default=kkk" flag:"user-cookie-name" desc:"(env USER_COOKIE_NAME) user cookie name"`
+	SecretKey       string `env:"SECRET_KEY" flag:"secret-key" desc:"(env SECRET_KEY) server secret key"`
 	stg             storage.Storage
 }
 
@@ -33,6 +36,32 @@ func (cfg *Config) GetStorage() storage.Storage {
 		}
 	}
 	return cfg.stg
+}
+
+func (cfg *Config) GetSecretKey() (ret []byte, err error) {
+	storageSecretKey := cfg.GetStorage().GetSecretKey()
+	if len(storageSecretKey) == 0 {
+		if cfg.SecretKey == "" {
+			ret, err = crypto.GenerateSecretKey(32)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			ret = []byte(cfg.SecretKey)
+		}
+		err = cfg.GetStorage().PutSecretKey(ret)
+		if err != nil {
+			return nil, err
+		}
+		return
+	} else {
+		if cfg.SecretKey == "" || cfg.SecretKey == string(storageSecretKey) {
+			ret = storageSecretKey
+		} else {
+			return nil, fmt.Errorf("its different secret keys in env and in storage")
+		}
+		return
+	}
 }
 
 type myCustomEnvLookuper struct{}

@@ -2,28 +2,57 @@ package storage
 
 import (
 	"fmt"
-	"net/url"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 )
 
 type InMemoryStorage struct {
-	key2url map[string]*url.URL
+	SecretKey  []byte
+	Key2Record map[string]*types.Record
 }
 
 func NewInMemoryStorage() *InMemoryStorage {
 	return &InMemoryStorage{
-		key2url: make(map[string]*url.URL),
+		Key2Record: make(map[string]*types.Record),
 	}
 }
 
-func (s *InMemoryStorage) Put(key string, url *url.URL) (err error) {
-	if _, isOk := s.Get(key); isOk {
-		return fmt.Errorf("key %q already exists", key)
+func (s *InMemoryStorage) PutSecretKey(secretKey []byte) (err error) {
+	s.SecretKey = secretKey
+	return nil
+}
+
+func (s *InMemoryStorage) GetSecretKey() []byte {
+	return s.SecretKey
+}
+
+func (s *InMemoryStorage) PutRecord(r *types.Record) (err error) {
+	if _, isAlreadyExists := s.Key2Record[r.Key]; isAlreadyExists {
+		return fmt.Errorf("record with key %q already exists", r.Key)
 	}
-	s.key2url[key] = url
+
+	s.Key2Record[r.Key] = r
 	return
 }
 
-func (s *InMemoryStorage) Get(key string) (url *url.URL, isOk bool) {
-	url, isOk = s.key2url[key]
+func (s *InMemoryStorage) GetRecord(key string) (r *types.Record) {
+	r, isOk := s.Key2Record[key]
+	if !isOk {
+		return nil
+	}
+
 	return
+}
+
+func (s *InMemoryStorage) GetAllUserRecords(user types.User) (userKey2Record map[string]*types.Record) {
+	userKey2Record = make(map[string]*types.Record)
+	for key, record := range s.Key2Record {
+		if *record.User == *user {
+			userKey2Record[key] = record
+		}
+	}
+	return
+}
+
+func (s *InMemoryStorage) IsEmpty() bool {
+	return len(s.SecretKey) == 0 && len(s.Key2Record) == 0
 }

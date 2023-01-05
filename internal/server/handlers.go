@@ -3,9 +3,10 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 	"github.com/Kirill-Znamenskiy/Shortener/internal/config"
-	"github.com/Kirill-Znamenskiy/Shortener/internal/storage"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"io"
@@ -25,7 +26,8 @@ const (
 
 func MakeMainHandler(cfg *config.Config) http.Handler {
 
-	hs := &Handlers{cfg: cfg, stg: cfg.GetStorage()}
+	shortener := blogic.NewShortener(cfg.BaseURL, cfg.GetStorage())
+	hs := &handlers{cfg: cfg, shortener: shortener}
 
 	r := chi.NewRouter()
 
@@ -37,9 +39,13 @@ func MakeMainHandler(cfg *config.Config) http.Handler {
 
 	r.Use(middleware.AllowContentType("", TextHTML, TextPlain, ApplicationJSON))
 
+	r.Use(AuthUserMiddleware(cfg, shortener.GenerateNewUser))
+
 	r.Post("/", hs.makeWrapperForJSONHandlerFunc(hs.makeSaveNewURLHandlerFunc()))
-	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
 	r.Get("/{key:[-\\w]+}", hs.makeGetURLHandlerFunc())
+
+	r.Post("/api/shorten", hs.makeSaveNewURLHandlerFunc())
+	r.Get("/api/user/urls", hs.makeGetUserURLsHandlerFunc())
 
 	r.HandleFunc("/*", func(w http.ResponseWriter, req *http.Request) {
 		log.Printf("UNEXPECTED: %s %q\n", req.Method, req.URL.Path)
@@ -49,12 +55,12 @@ func MakeMainHandler(cfg *config.Config) http.Handler {
 	return r
 }
 
-type Handlers struct {
-	cfg *config.Config
-	stg storage.Storage
+type handlers struct {
+	cfg       *config.Config
+	shortener *blogic.Shortener
 }
 
-func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) http.HandlerFunc {
+func (hs *handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		hContentType := req.Header.Get("Content-Type")
 
@@ -75,7 +81,7 @@ func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) 
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-			reqBodyCont = []byte(`{"URL":"` + string(reqBodyCont) + `"}`)
+			reqBodyCont = []byte(`{"url":"` + string(reqBodyCont) + `"}`)
 			req.Body = io.NopCloser(bytes.NewReader(reqBodyCont))
 
 			req.Header.Set("Content-Type", ApplicationJSON)
@@ -111,7 +117,7 @@ func (hs *Handlers) makeWrapperForJSONHandlerFunc(nextJSONHandler http.Handler) 
 	}
 }
 
-func (hs *Handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
+func (hs *handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		hContentType := req.Header.Get("Content-Type")
 		if hContentType == "" {
@@ -138,7 +144,12 @@ func (hs *Handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 			return
 		}
 
-		key, err := blogic.SaveNewURL(hs.stg, reqData.URL)
+		userUUID, err := extractUser(req)
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
+
+		record, err := hs.shortener.SaveNewURL(userUUID, reqData.URL)
 		if checkErrorAsInternalServerError(w, err) {
 			return
 		}
@@ -146,32 +157,47 @@ func (hs *Handlers) makeSaveNewURLHandlerFunc() http.HandlerFunc {
 		respData := new(struct {
 			Result string `json:"result"`
 		})
-		respData.Result = hs.cfg.BaseURL + "/" + key
+		respData.Result = hs.shortener.BuildShortURL(record)
 
-		respBodyBytes, err := json.Marshal(respData)
-		if checkErrorAsInternalServerError(w, err) {
-			return
-		}
-
-		w.Header().Set("Content-Type", ApplicationJSONCharsetUTF8)
-		w.WriteHeader(http.StatusCreated)
-
-		_, err = w.Write(respBodyBytes)
-		if checkErrorAsInternalServerError(w, err) {
-			return
-		}
+		finishHandler(w, respData, http.StatusCreated)
 	}
 }
 
-func (hs *Handlers) makeGetURLHandlerFunc() http.HandlerFunc {
+func (hs *handlers) makeGetURLHandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		key := chi.URLParam(req, "key")
 
-		if url, isOk := blogic.GetSavedURL(hs.stg, key); isOk {
+		if url, isOk := hs.shortener.GetSavedURL(key); isOk {
 			w.Header().Add("Location", url.String())
 			w.WriteHeader(http.StatusTemporaryRedirect)
 		} else {
 			http.Error(w, "Resource Not Found", http.StatusNotFound)
+		}
+	}
+}
+
+func (hs *handlers) makeGetUserURLsHandlerFunc() http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		user, err := extractUser(req)
+		if checkErrorAsInternalServerError(w, err) {
+			return
+		}
+		allUserRecords := hs.shortener.GetAllUserRecords(user)
+
+		if len(allUserRecords) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			respData := make([]struct {
+				ShortURL    string `json:"short_url"`
+				OriginalURL string `json:"original_url"`
+			}, len(allUserRecords))
+			ind := 0
+			for _, record := range allUserRecords {
+				respData[ind].ShortURL = hs.shortener.BuildShortURL(record)
+				respData[ind].OriginalURL = record.OriginalURL.String()
+			}
+
+			finishHandler(w, respData, http.StatusOK)
 		}
 	}
 }
@@ -191,4 +217,36 @@ func checkError(w http.ResponseWriter, err error, respHTTPCode int) bool {
 		return true
 	}
 	return false
+}
+
+type myString string
+
+const userContextValueKey myString = "user"
+
+func extractUser(req *http.Request) (ret types.User, err error) {
+	ret, isOk := req.Context().Value(userContextValueKey).(types.User)
+	if !isOk {
+		return nil, errors.New("error at extracting user")
+	}
+	return
+}
+
+func finishHandler(w http.ResponseWriter, respData any, respStatusCode int) {
+
+	respBodyBytes, err := json.Marshal(respData)
+	if checkErrorAsInternalServerError(w, err) {
+		return
+	}
+
+	w.Header().Set("Content-Type", ApplicationJSONCharsetUTF8)
+
+	if respStatusCode == 0 {
+		respStatusCode = http.StatusOK
+	}
+	w.WriteHeader(respStatusCode)
+
+	_, err = w.Write(respBodyBytes)
+	if checkErrorAsInternalServerError(w, err) {
+		return
+	}
 }

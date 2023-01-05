@@ -4,9 +4,9 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"github.com/Kirill-Znamenskiy/Shortener/internal/blogic/types"
 	"io"
 	"log"
-	"net/url"
 	"os"
 )
 
@@ -26,8 +26,16 @@ func NewFileStorage(filePath string) (ret *FileStorage) {
 	return
 }
 
-func (s *FileStorage) Put(key string, url *url.URL) (err error) {
-	err = s.InMemoryStorage.Put(key, url)
+func (s *FileStorage) PutSecretKey(secretKey []byte) (err error) {
+	err = s.InMemoryStorage.PutSecretKey(secretKey)
+	if err != nil {
+		return
+	}
+	err = s.SaveDataToFile()
+	return
+}
+func (s *FileStorage) PutRecord(r *types.Record) (err error) {
+	err = s.InMemoryStorage.PutRecord(r)
 	if err != nil {
 		return
 	}
@@ -54,7 +62,7 @@ func (s *FileStorage) LoadDataFromFile() (err error) {
 	}
 
 	if len(toLoadBytes) > 0 {
-		err = json.Unmarshal(toLoadBytes, &s.InMemoryStorage.key2url)
+		err = json.Unmarshal(toLoadBytes, s.InMemoryStorage)
 		if err != nil {
 			return
 		}
@@ -64,10 +72,6 @@ func (s *FileStorage) LoadDataFromFile() (err error) {
 }
 
 func (s *FileStorage) SaveDataToFile() (err error) {
-	toSaveData := s.InMemoryStorage.key2url
-	if len(toSaveData) == 0 {
-		return
-	}
 
 	file, err := os.OpenFile(s.filePath, os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
@@ -75,7 +79,11 @@ func (s *FileStorage) SaveDataToFile() (err error) {
 	}
 	defer file.Close()
 
-	toSaveBytes, err := json.Marshal(&toSaveData)
+	if s.InMemoryStorage.IsEmpty() {
+		return
+	}
+
+	toSaveBytes, err := json.Marshal(s.InMemoryStorage)
 	if err != nil {
 		return
 	}
