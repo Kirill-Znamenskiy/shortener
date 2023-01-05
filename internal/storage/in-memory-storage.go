@@ -56,3 +56,7 @@ func (s *InMemoryStorage) GetAllUserRecords(user types.User) (userKey2Record map
 func (s *InMemoryStorage) IsEmpty() bool {
 	return len(s.SecretKey) == 0 && len(s.Key2Record) == 0
 }
+
+func (s *InMemoryStorage) Ping() error {
+	return nil
+}
