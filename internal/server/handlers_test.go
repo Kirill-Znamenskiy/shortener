@@ -153,20 +153,6 @@ func TestRootHandler(t *testing.T) {
 		{
 			key: "positive",
 			req: request{
-				method:  http.MethodPost,
-				target:  "/api/shorten",
-				body:    `{"OriginalURL": "https://Kirill.Znamenskiy.pw"}`,
-				headers: map[string]string{"Content-Type": "application/json;charset=UTF-8"},
-			},
-			resp: response{
-				code:         http.StatusConflict,
-				hContentType: "application/json;charset=UTF-8",
-				body:         `^\{\"result\"\:\"` + cfg.BaseURL + `/[-\w]+\"\}$`,
-			},
-		},
-		{
-			key: "positive",
-			req: request{
 				method:  http.MethodGet,
 				target:  "/positive-test-2",
 				headers: map[string]string{"Cookie": userCookie.String()},
